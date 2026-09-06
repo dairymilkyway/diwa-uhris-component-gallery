@@ -1,7 +1,7 @@
 name: Publish @diwauhris/ui to npm
 
-# Triggers on every push to main
-# Automatically bumps the patch version, creates a git tag, and publishes
+# Triggers on every push to main.
+# Automatically bumps patch version, creates a git tag, and publishes to npm.
 on:
   push:
     branches:
@@ -14,7 +14,6 @@ jobs:
 
     steps:
       # 1. Checkout with full history and write access
-      #    persist-credentials so we can push the version tag back
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -38,22 +37,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 5. TypeScript check — must pass before building
-      - name: TypeScript check
-        run: npx tsc --noEmit --project tsconfig.lib.json
-
-      # 6. Bump patch version
-      #    This updates package.json, commits, and creates a git tag automatically
-      #    e.g. 1.7.4 → 1.7.5
+      # 5. Bump patch version (updates package.json only, no commit yet)
       - name: Bump patch version
         run: npm version patch --no-git-tag-version
 
-      # 7. Read the new version so we can use it in later steps
+      # 6. Read the new version for use in later steps
       - name: Read new version
         id: version
         run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-      # 8. Commit the version bump and push tag
+      # 7. Build the library — ESM + CJS + CSS + type declarations
+      #    tsc -b runs internally; build failure = type errors caught here
+      - name: Build library
+        run: npm run build:lib
+
+      # 8. Commit version bump, tag, and push
       - name: Commit and tag
         run: |
           git add package.json package-lock.json
@@ -61,11 +59,7 @@ jobs:
           git tag v${{ steps.version.outputs.version }}
           git push origin main --follow-tags
 
-      # 9. Build the library (ESM + CJS + CSS + type declarations)
-      - name: Build library
-        run: npm run build:lib
-
-      # 10. Publish to npm
+      # 9. Publish to npm
       - name: Publish to npm
         run: npm publish --access public
         env:
