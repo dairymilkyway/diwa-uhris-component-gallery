@@ -1,43 +1,71 @@
 name: Publish @diwauhris/ui to npm
 
-# Triggers when you push a version tag like: v1.7.5, v1.8.0, v2.0.0
+# Triggers on every push to main
+# Automatically bumps the patch version, creates a git tag, and publishes
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 jobs:
   publish:
-    name: Build and publish
+    name: Version bump, build, and publish
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the code
+      # 1. Checkout with full history and write access
+      #    persist-credentials so we can push the version tag back
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Set up Node.js with the npm registry configured
+      # 2. Set up Node.js with npm registry configured
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      # 3. Install dependencies
+      # 3. Configure git identity for the version commit
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # 4. Install dependencies
       - name: Install dependencies
         run: npm ci
 
-      # 4. TypeScript check — must pass before building
+      # 5. TypeScript check — must pass before building
       - name: TypeScript check
         run: npx tsc --noEmit --project tsconfig.lib.json
 
-      # 5. Build the library (ESM + CJS + CSS + type declarations)
+      # 6. Bump patch version
+      #    This updates package.json, commits, and creates a git tag automatically
+      #    e.g. 1.7.4 → 1.7.5
+      - name: Bump patch version
+        run: npm version patch --no-git-tag-version
+
+      # 7. Read the new version so we can use it in later steps
+      - name: Read new version
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      # 8. Commit the version bump and push tag
+      - name: Commit and tag
+        run: |
+          git add package.json package-lock.json
+          git commit -m "chore: release v${{ steps.version.outputs.version }} [skip ci]"
+          git tag v${{ steps.version.outputs.version }}
+          git push origin main --follow-tags
+
+      # 9. Build the library (ESM + CJS + CSS + type declarations)
       - name: Build library
         run: npm run build:lib
 
-      # 6. Publish to npm
-      #    NODE_AUTH_TOKEN uses the NPM_TOKEN secret you set in GitHub
-      #    --access public is required for scoped packages (@diwauhris/ui)
+      # 10. Publish to npm
       - name: Publish to npm
         run: npm publish --access public
         env:
