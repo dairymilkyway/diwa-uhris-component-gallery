@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+# Grant the workflow write permission to push the version bump commit back
+permissions:
+  contents: write
+
 jobs:
   publish:
     name: Version bump, build, and publish
