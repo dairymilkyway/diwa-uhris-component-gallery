@@ -1,0 +1,391 @@
+/* ── Web fonts ───────────────────────────────────────────────────────────────
+   Self-hosted via @fontsource — SIL Open Font License.
+   @import statements must precede all other CSS (spec requirement).
+
+   Barlow — heading font (latin subset, weights 700 and 800 only).
+   Digital implementation of the Helvetica Neue (85) brand heading role.
+   Weights 700/800 match the authority of the brand's display/heading typeface.
+
+   Libre Franklin variable — body/UI font (all weights in one file).
+   Digital implementation of the ITC Franklin Gothic Std brand body role. */
+@import '@fontsource/barlow/latin-700.css';
+@import '@fontsource/barlow/latin-800.css';
+@import '@fontsource-variable/libre-franklin';
+@import 'react-calendar/dist/Calendar.css';
+
+@tailwind utilities;
+
+/* Hide scrollbar while preserving scroll functionality */
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Preflight-equivalent resets (Tailwind preflight is disabled in tailwind.config.js).
+   These let `border-*` utilities render and strip native button/link chrome without
+   clobbering hand-written component classes. */
+*, ::before, ::after { border-width: 0; border-style: solid; border-color: #e2e8f0; }
+a { color: inherit; text-decoration: inherit; }
+button { background-color: transparent; background-image: none; cursor: pointer; }
+button, [role='button'] { cursor: pointer; }
+button:disabled, [disabled] { cursor: not-allowed; }
+button, input, optgroup, select, textarea { font-family: inherit; font-size: 100%; font-weight: inherit; line-height: inherit; color: inherit; }
+button, select { text-transform: none; }
+
+/* Tailwind composes transform/ring/shadow/filter utilities from CSS variables that
+   are normally initialized by @tailwind base. Base is excluded here (preflight off),
+   so initialize them manually — otherwise translate/scale/ring/shadow/backdrop
+   utilities emit invalid values and silently do nothing. */
+*, ::before, ::after {
+  --tw-translate-x: 0; --tw-translate-y: 0; --tw-rotate: 0; --tw-skew-x: 0; --tw-skew-y: 0;
+  --tw-scale-x: 1; --tw-scale-y: 1;
+  --tw-pan-x: ; --tw-pan-y: ; --tw-pinch-zoom: ;
+  --tw-gradient-from-position: ; --tw-gradient-via-position: ; --tw-gradient-to-position: ;
+  --tw-ring-inset: ; --tw-ring-offset-width: 0px; --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(3 78 162 / 0.4); --tw-ring-offset-shadow: 0 0 #0000; --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000; --tw-shadow-colored: 0 0 #0000;
+  --tw-blur: ; --tw-brightness: ; --tw-contrast: ; --tw-grayscale: ; --tw-hue-rotate: ;
+  --tw-invert: ; --tw-saturate: ; --tw-sepia: ; --tw-drop-shadow: ;
+  --tw-backdrop-blur: ; --tw-backdrop-brightness: ; --tw-backdrop-contrast: ; --tw-backdrop-grayscale: ;
+  --tw-backdrop-hue-rotate: ; --tw-backdrop-invert: ; --tw-backdrop-opacity: ; --tw-backdrop-saturate: ; --tw-backdrop-sepia: ;
+}
+
+/* ── Body & base typography ─────────────────────────────────────────────────
+   Official brand body typeface: ITC Franklin Gothic Std (commercial).
+   Digital implementation: Libre Franklin (bundled, SIL OFL) — humanist gothic,
+   closely matching the character and weight of ITC Franklin Gothic Std.
+   OS fallbacks: Franklin Gothic Medium (Windows), Gill Sans (macOS), system-ui.
+
+   All UI text — buttons, inputs, labels, navigation — inherits from body.
+   Headings use `font-heading` (Barlow) — applied explicitly via Tailwind class. */
+body {
+  font-family: 'Libre Franklin', 'Franklin Gothic Medium', 'Franklin Gothic',
+               'ITC Franklin Gothic Std', 'Gill Sans', 'Trebuchet MS',
+               system-ui, sans-serif;
+  background: theme('colors.surface-page'); /* #f4f6f9 — defined in tailwind.config.js */
+  color: theme('colors.body-base');         /* #0c1a2e — defined in tailwind.config.js */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Inline code in prose — keep neutral for non-gallery contexts */
+code {
+  background: #e8edf3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ===== Motion ===== */
+@keyframes osFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes osPop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes osSlideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes osSlideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes osBounceIn { 0% { opacity: 0; transform: scale(0.85); } 60% { transform: scale(1.06); } 80% { transform: scale(0.97); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes osBarIn   { from { opacity: 0; transform: scaleX(0); } to { opacity: 1; transform: scaleX(1); } }
+
+.os-fade        { animation: osFade        0.16s ease-out; }
+.os-pop         { animation: osPop         0.2s  cubic-bezier(0.16, 1, 0.3, 1); }
+.os-slide-up    { animation: osSlideUp     0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.os-slide-in-right { animation: osSlideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1); }
+.os-bounce-in   { animation: osBounceIn    0.35s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.os-bar-in      { animation: osBarIn       0.22s cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: left; }
+
+@media (prefers-reduced-motion: reduce) {
+  .os-fade, .os-pop, .os-slide-up, .os-slide-in-right, .os-bounce-in, .os-bar-in { animation: none; }
+}
+
+/* ===== Skeleton shimmer ===== */
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.skeleton-bar { display: inline-block; border-radius: 4px; background: #dde3ec; animation: skeleton-pulse 1.4s ease-in-out infinite; }
+
+@keyframes skeleton-shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #dde3ec 25%,
+    #eef1f6 50%,
+    #dde3ec 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+    background: #dde3ec;
+  }
+}
+
+/* ===== Field shake (used by Field.tsx on error) ===== */
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+.shake { animation: shake 0.4s ease-in-out; }
+
+/* ===== Toast — Alert-style overrides =====================================
+   richColors is enabled on <Toaster>. Sonner applies background/border/text
+   per type via [data-rich-colors='true'][data-sonner-toast][data-type='*'].
+   We override its CSS variables to match Alert's exact Tailwind palette,
+   then add the left border rule on top of Sonner's styled layout.
+===================================================================== */
+
+/* Override Sonner's light-theme color vars to match Alert's Tailwind palette */
+[data-sonner-toaster][data-sonner-theme='light'] {
+  /* success → emerald */
+  --success-bg:     theme('colors.emerald.50');
+  --success-border: theme('colors.emerald.400');
+  --success-text:   theme('colors.emerald.800');
+
+  /* info → sky */
+  --info-bg:     theme('colors.sky.50');
+  --info-border: theme('colors.sky.400');
+  --info-text:   theme('colors.sky.800');
+
+  /* warning → amber */
+  --warning-bg:     theme('colors.amber.50');
+  --warning-border: theme('colors.amber.400');
+  --warning-text:   theme('colors.amber.800');
+
+  /* error → rose (matches Alert's "danger" tone) */
+  --error-bg:     theme('colors.rose.50');
+  --error-border: theme('colors.rose.500');
+  --error-text:   theme('colors.rose.800');
+}
+
+/* Left border rule — applied to all rich-color variants */
+[data-rich-colors='true'][data-sonner-toast][data-type='success'],
+[data-rich-colors='true'][data-sonner-toast][data-type='info'],
+[data-rich-colors='true'][data-sonner-toast][data-type='warning'],
+[data-rich-colors='true'][data-sonner-toast][data-type='error'] {
+  border: none;
+  border-left: 4px solid var(--success-border); /* overridden per-type below */
+}
+
+[data-rich-colors='true'][data-sonner-toast][data-type='success'] {
+  border-left-color: theme('colors.emerald.400');
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='info'] {
+  border-left-color: theme('colors.sky.400');
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='warning'] {
+  border-left-color: theme('colors.amber.400');
+}
+[data-rich-colors='true'][data-sonner-toast][data-type='error'] {
+  border-left-color: theme('colors.rose.500');
+}
+
+/* Close button inherits the tinted bg */
+[data-rich-colors='true'][data-sonner-toast][data-type='success'] [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='info']    [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='warning'] [data-close-button],
+[data-rich-colors='true'][data-sonner-toast][data-type='error']   [data-close-button] {
+  border: none;
+}
+
+/* Font */
+[data-sonner-toast][data-styled='true'] {
+  font-family: 'Libre Franklin', 'Franklin Gothic Medium', system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* ===== Date Picker (react-calendar) ===== */
+.pis-datepicker-popover {
+  position: absolute;
+  z-index: 50;
+  margin-top: 6px;
+  background: #fff;
+  border: 1px solid #dde3ec;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(3, 78, 162, 0.10), 0 1px 4px rgba(3, 78, 162, 0.06);
+  animation: datepickerIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+@keyframes datepickerIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.pis-rc-calendar {
+  width: 320px;
+  border: none;
+  background: #fff;
+  font-family: inherit;
+  line-height: 1.125em;
+  padding: 16px;
+}
+
+/* -- Navigation -- */
+.pis-rc-calendar .react-calendar__navigation {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  margin-bottom: 8px;
+}
+
+.pis-rc-calendar .react-calendar__navigation button {
+  min-width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8fa3be;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.pis-rc-calendar .react-calendar__navigation button:enabled:hover {
+  background: #eef2f8;
+  color: #034EA2;
+}
+.pis-rc-calendar .react-calendar__navigation button:disabled {
+  color: #dde3ec;
+  cursor: default;
+}
+
+.pis-rc-calendar .react-calendar__navigation__label {
+  flex: 1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #0c1a2e;
+  letter-spacing: -0.01em;
+}
+.pis-rc-calendar .react-calendar__navigation__label:enabled:hover {
+  color: #034EA2;
+}
+
+.pis-rc-calendar .react-calendar__navigation__prev-button,
+.pis-rc-calendar .react-calendar__navigation__next-button {
+  font-size: 0;
+}
+
+/* -- Weekday header -- */
+.pis-rc-calendar .react-calendar__month-view__weekdays {
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #8fa3be;
+  padding: 0 0 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #eef2f8;
+}
+
+.pis-rc-calendar .react-calendar__month-view__weekdays abbr {
+  text-decoration: none;
+  border: none;
+  cursor: default;
+}
+
+.pis-rc-calendar .react-calendar__month-view__weekdays__weekday {
+  padding: 4px 0;
+}
+
+/* -- Tile base -- */
+.pis-rc-calendar .react-calendar__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #2c3e55;
+  cursor: pointer;
+  transition: all 0.08s;
+}
+.pis-rc-calendar .react-calendar__tile:enabled:hover {
+  background: #eef2f8;
+}
+.pis-rc-calendar .react-calendar__tile:enabled:focus {
+  outline: 2px solid #034EA2;
+  outline-offset: -2px;
+}
+
+/* -- Tiles: now (today) -- */
+.pis-rc-calendar .react-calendar__tile--now {
+  font-weight: 700;
+  color: #034EA2;
+}
+
+/* -- Tiles: active (selected) -- */
+.pis-rc-calendar .react-calendar__tile--active {
+  background: #034EA2 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.pis-rc-calendar .react-calendar__tile--active:enabled:hover {
+  background: #00377B !important;
+}
+
+/* -- Tiles: disabled -- */
+.pis-rc-calendar .react-calendar__tile:disabled {
+  color: #c8d0db;
+  cursor: default;
+}
+.pis-rc-calendar .react-calendar__tile--disabled {
+  color: #c8d0db;
+}
+
+/* -- Neighboring month days -- */
+.pis-rc-calendar .react-calendar__month-view__days__day--neighboringMonth {
+  color: #dde3ec;
+}
+
+/* -- Year / Decade / Century views -- */
+.pis-rc-calendar .react-calendar__year-view__months,
+.pis-rc-calendar .react-calendar__decade-view__years,
+.pis-rc-calendar .react-calendar__century-view__decades {
+  gap: 8px;
+  padding: 6px;
+}
+/* Override react-calendar's inline flexBasis to get 4x3 grid */
+.pis-rc-calendar .react-calendar__year-view__months > *,
+.pis-rc-calendar .react-calendar__decade-view__years > *,
+.pis-rc-calendar .react-calendar__century-view__decades > * {
+  flex: 0 0 calc(25% - 6px) !important;
+  max-width: calc(25% - 6px) !important;
+}
+
+.pis-rc-calendar .react-calendar__year-view__months__month,
+.pis-rc-calendar .react-calendar__decade-view__years__year,
+.pis-rc-calendar .react-calendar__century-view__decades__decade {
+  height: 48px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.08s;
+}
+.pis-rc-calendar .react-calendar__year-view__months__month:enabled:hover,
+.pis-rc-calendar .react-calendar__decade-view__years__year:enabled:hover,
+.pis-rc-calendar .react-calendar__century-view__decades__decade:enabled:hover {
+  background: #eef2f8;
+}
+
+/* -- Month/Year/Decade tiles: active -- */
+.pis-rc-calendar .react-calendar__year-view__months__month.react-calendar__tile--active,
+.pis-rc-calendar .react-calendar__decade-view__years__year.react-calendar__tile--active,
+.pis-rc-calendar .react-calendar__century-view__decades__decade.react-calendar__tile--active {
+  background: #034EA2 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.pis-rc-calendar .react-calendar__year-view__months__month.react-calendar__tile--active:enabled:hover,
+.pis-rc-calendar .react-calendar__decade-view__years__year.react-calendar__tile--active:enabled:hover,
+.pis-rc-calendar .react-calendar__century-view__decades__decade.react-calendar__tile--active:enabled:hover {
+  background: #00377B !important;
+}

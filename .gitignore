@@ -1,0 +1,57 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+lib
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Skills
+.agents
+skills-lock.json
+AGENTS.md
+.kiro
+
+# Internal audit/session files
+semantic-review
+CUSTOMIZABILITY_PATCHES.md
+GALLERY_AUDIT.md
+PRODUCTION_GAPS.md
+audit-center.cjs
+audit-roots.cjs
+find-center-false.cjs
+
+# Graphify
+graphify-out/
+
+# Approvals Docs
+docs
+
+
+# Impeccable context files 
+PRODUCT.md
+DESIGN.md
+.impeccable

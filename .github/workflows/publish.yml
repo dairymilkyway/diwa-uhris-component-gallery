@@ -1,0 +1,44 @@
+name: Publish @diwauhris/ui to npm
+
+# Triggers when you push a version tag like: v1.7.5, v1.8.0, v2.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js with the npm registry configured
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. TypeScript check — must pass before building
+      - name: TypeScript check
+        run: npx tsc --noEmit --project tsconfig.lib.json
+
+      # 5. Build the library (ESM + CJS + CSS + type declarations)
+      - name: Build library
+        run: npm run build:lib
+
+      # 6. Publish to npm
+      #    NODE_AUTH_TOKEN uses the NPM_TOKEN secret you set in GitHub
+      #    --access public is required for scoped packages (@diwauhris/ui)
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
