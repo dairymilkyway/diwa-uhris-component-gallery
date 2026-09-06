@@ -17,6 +17,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/ui-library"],
+  "include": ["src/ui-library", "src/lib"],
   "exclude": ["src/ui-library/gallery"]
 }
