@@ -221,25 +221,31 @@ export function Stepper({
               aria-current={isCurrent ? 'step' : undefined}
               className="flex flex-col items-center"
             >
-              {/* Circle + connectors row */}
-              <div className="flex w-full items-center">
-                {/* Left connector */}
-                {idx > 0 ? (
-                  <div className={`h-0.5 flex-1 ${connectorLeft}`} aria-hidden="true" />
-                ) : (
-                  <div className="flex-1" aria-hidden="true" />
+              {/* Circle + connectors row — relative so connectors can be absolute half-spans */}
+              <div className="relative flex h-9 w-full items-center justify-center">
+                {/* Left connector: cell left-edge → circle center */}
+                {idx > 0 && (
+                  <div
+                    className={`absolute inset-y-0 left-0 right-1/2 flex items-center`}
+                    aria-hidden="true"
+                  >
+                    <div className={`h-0.5 w-full ${connectorLeft}`} />
+                  </div>
                 )}
 
-                {/* Circle — always centered */}
-                <div className="shrink-0 z-10">
+                {/* Circle — sits on top of connectors via z-10 */}
+                <div className="relative shrink-0 z-10">
                   <StepCircle state={state} number={idx + 1} icon={step.icon} dark={dark} />
                 </div>
 
-                {/* Right connector */}
-                {!isLast ? (
-                  <div className={`h-0.5 flex-1 ${connectorRight}`} aria-hidden="true" />
-                ) : (
-                  <div className="flex-1" aria-hidden="true" />
+                {/* Right connector: circle center → cell right-edge */}
+                {!isLast && (
+                  <div
+                    className={`absolute inset-y-0 left-1/2 right-0 flex items-center`}
+                    aria-hidden="true"
+                  >
+                    <div className={`h-0.5 w-full ${connectorRight}`} />
+                  </div>
                 )}
               </div>
 

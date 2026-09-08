@@ -4,8 +4,13 @@
  * Updated to import FieldContext from gallery-local field directory.
  * Uses react-calendar and date-fns.
  * Note: CSS for .pis-datepicker-popover and .pis-rc-calendar is in index.css.
+ *
+ * Popover is rendered via createPortal into document.body so that
+ * position:fixed works correctly even when the DatePicker is inside a
+ * CSS transform context (e.g. a Modal with -translate-x/y centering).
  */
 import { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { createPortal } from 'react-dom';
 import Calendar from 'react-calendar';
 import { format, parse, isValid } from 'date-fns';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -49,6 +54,7 @@ export function DatePicker({
   const [isOpen, setIsOpen] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const internalId = useId();
 
@@ -100,7 +106,11 @@ export function DatePicker({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        wrapperRef.current && !wrapperRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -186,8 +196,9 @@ export function DatePicker({
         />
       </div>
 
-      {isOpen && !disabled && (
+      {isOpen && !disabled && createPortal(
         <div
+          ref={popoverRef}
           className="pis-datepicker-popover"
           style={popupStyle}
           role="dialog"
@@ -222,7 +233,8 @@ export function DatePicker({
             }}
             className="pis-rc-calendar"
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
