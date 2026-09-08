@@ -119,7 +119,7 @@ export function Stepper({
         aria-label="Progress"
         className={cn('flex flex-col', className)}
       >
-        <ol className="flex flex-col">
+        <ol className="flex flex-col" aria-orientation="vertical">
           {steps.map((step, idx) => {
             const state = resolveState(step.id, currentStep, completedSteps, disabledSteps);
             const isCurrent = state === 'current';
@@ -200,6 +200,7 @@ export function Stepper({
     >
       <ol
         className="grid w-full"
+        aria-orientation="horizontal"
         style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}
       >
         {steps.map((step, idx) => {
@@ -207,7 +208,7 @@ export function Stepper({
           const isCurrent = state === 'current';
           const isLast = idx === steps.length - 1;
           const prevState = idx > 0 ? resolvedStates[idx - 1] : null;
-          const connectorDone = prevState === 'completed' || prevState === 'current';
+          const connectorDone = prevState === 'completed';
           const connectorLeft = dark
             ? (connectorDone ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
             : (connectorDone ? 'bg-brand-blue/50' : 'bg-slate-200');
