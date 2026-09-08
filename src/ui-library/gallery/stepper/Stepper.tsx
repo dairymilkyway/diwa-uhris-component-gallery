@@ -46,6 +46,8 @@ export interface StepperProps {
   /** IDs of steps that are disabled */
   disabledSteps?: string[];
   orientation?: 'horizontal' | 'vertical';
+  /** Use "dark" when rendering on a dark/navy background */
+  theme?: 'light' | 'dark';
   className?: string;
 }
 
@@ -65,15 +67,24 @@ function resolveState(
 
 // ── Step indicator circle ─────────────────────────────────────────────────────
 
-function StepCircle({ state, number, icon }: { state: StepState; number: number; icon?: ReactNode }) {
+function StepCircle({ state, number, icon, dark = false }: { state: StepState; number: number; icon?: ReactNode; dark?: boolean }) {
   const base = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold transition-all';
 
-  const styles: Record<StepState, string> = {
+  const lightStyles: Record<StepState, string> = {
     completed: 'border-brand-blue bg-brand-blue text-white',
     current:   'border-brand-blue bg-white text-brand-blue shadow-md shadow-brand-blue/15',
     upcoming:  'border-slate-300 bg-white text-slate-400',
     disabled:  'border-slate-200 bg-slate-50 text-slate-300',
   };
+
+  const darkStyles: Record<StepState, string> = {
+    completed: 'border-[#2D8ACA] bg-[#2D8ACA] text-white',
+    current:   'border-white bg-white text-[#00377B] shadow-md shadow-black/20',
+    upcoming:  'border-white/30 bg-white/10 text-white/60',
+    disabled:  'border-white/10 bg-white/5 text-white/20',
+  };
+
+  const styles = dark ? darkStyles : lightStyles;
 
   return (
     <div className={`${base} ${styles[state]}`} aria-hidden="true">
@@ -94,9 +105,11 @@ export function Stepper({
   completedSteps = [],
   disabledSteps  = [],
   orientation = 'horizontal',
+  theme = 'light',
   className = '',
 }: StepperProps) {
   const isHorizontal = orientation === 'horizontal';
+  const dark = theme === 'dark';
 
   if (!isHorizontal) {
     // ── Vertical layout ───────────────────────────────────────────────────────
@@ -111,12 +124,20 @@ export function Stepper({
             const state = resolveState(step.id, currentStep, completedSteps, disabledSteps);
             const isCurrent = state === 'current';
             const isLast = idx === steps.length - 1;
-            const labelColor: Record<StepState, string> = {
+            const labelColor: Record<StepState, string> = dark ? {
+              completed: 'text-[#2D8ACA]',
+              current:   'text-white font-bold',
+              upcoming:  'text-white/60',
+              disabled:  'text-white/20',
+            } : {
               completed: 'text-brand-blue',
               current:   'text-brand-navy font-bold',
               upcoming:  'text-slate-500',
               disabled:  'text-slate-300',
             };
+            const connectorColor = dark
+              ? (state === 'completed' ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
+              : (state === 'completed' ? 'bg-brand-blue/50' : 'bg-slate-200');
             return (
               <li
                 key={step.id}
@@ -124,12 +145,10 @@ export function Stepper({
                 className="flex items-start gap-4 pb-8 last:pb-0"
               >
                 <div className="relative flex flex-col items-center">
-                  <StepCircle state={state} number={idx + 1} icon={step.icon} />
+                  <StepCircle state={state} number={idx + 1} icon={step.icon} dark={dark} />
                   {!isLast && (
                     <div
-                      className={`mt-1 w-0.5 flex-1 min-h-[32px] ${
-                        state === 'completed' ? 'bg-brand-blue/50' : 'bg-slate-200'
-                      }`}
+                      className={`mt-1 w-0.5 flex-1 min-h-[32px] ${connectorColor}`}
                       aria-hidden="true"
                     />
                   )}
@@ -137,7 +156,7 @@ export function Stepper({
                 <div className="min-w-0 flex-1 pt-1">
                   <p className={`text-sm leading-tight ${labelColor[state]}`}>{step.label}</p>
                   {step.description && (
-                    <p className="mt-0.5 text-xs text-slate-400 leading-tight">{step.description}</p>
+                    <p className={`mt-0.5 text-xs leading-tight ${dark ? 'text-white/40' : 'text-slate-400'}`}>{step.description}</p>
                   )}
                 </div>
               </li>
@@ -149,14 +168,16 @@ export function Stepper({
   }
 
   // ── Horizontal layout ─────────────────────────────────────────────────────
-  // Grid approach: N equal columns, circle centered in each column,
-  // connector as a full-width bar on a separate row behind the circles.
-  // No translateX hacks needed.
   const resolvedStates = steps.map((step) =>
     resolveState(step.id, currentStep, completedSteps, disabledSteps)
   );
 
-  const labelColor: Record<StepState, string> = {
+  const labelColor: Record<StepState, string> = dark ? {
+    completed: 'text-[#2D8ACA]',
+    current:   'text-white font-bold',
+    upcoming:  'text-white/60',
+    disabled:  'text-white/20',
+  } : {
     completed: 'text-brand-blue',
     current:   'text-brand-navy font-bold',
     upcoming:  'text-slate-500',
@@ -178,8 +199,13 @@ export function Stepper({
           const isCurrent = state === 'current';
           const isLast = idx === steps.length - 1;
           const prevState = idx > 0 ? resolvedStates[idx - 1] : null;
-          // connector on the LEFT side of this step (between prev and current)
           const connectorDone = prevState === 'completed' || prevState === 'current';
+          const connectorLeft = dark
+            ? (connectorDone ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
+            : (connectorDone ? 'bg-brand-blue/50' : 'bg-slate-200');
+          const connectorRight = dark
+            ? (state === 'completed' ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
+            : (state === 'completed' ? 'bg-brand-blue/50' : 'bg-slate-200');
 
           return (
             <li
@@ -191,25 +217,19 @@ export function Stepper({
               <div className="flex w-full items-center">
                 {/* Left connector */}
                 {idx > 0 ? (
-                  <div
-                    className={`h-0.5 flex-1 ${connectorDone ? 'bg-brand-blue/50' : 'bg-slate-200'}`}
-                    aria-hidden="true"
-                  />
+                  <div className={`h-0.5 flex-1 ${connectorLeft}`} aria-hidden="true" />
                 ) : (
                   <div className="flex-1" aria-hidden="true" />
                 )}
 
                 {/* Circle — always centered */}
                 <div className="shrink-0 z-10">
-                  <StepCircle state={state} number={idx + 1} icon={step.icon} />
+                  <StepCircle state={state} number={idx + 1} icon={step.icon} dark={dark} />
                 </div>
 
                 {/* Right connector */}
                 {!isLast ? (
-                  <div
-                    className={`h-0.5 flex-1 ${state === 'completed' ? 'bg-brand-blue/50' : 'bg-slate-200'}`}
-                    aria-hidden="true"
-                  />
+                  <div className={`h-0.5 flex-1 ${connectorRight}`} aria-hidden="true" />
                 ) : (
                   <div className="flex-1" aria-hidden="true" />
                 )}
@@ -219,7 +239,7 @@ export function Stepper({
               <div className="mt-2 flex flex-col items-center text-center px-1">
                 <p className={`text-sm leading-tight ${labelColor[state]}`}>{step.label}</p>
                 {step.description && (
-                  <p className="mt-0.5 text-xs text-slate-400 leading-tight">{step.description}</p>
+                  <p className={`mt-0.5 text-xs leading-tight ${dark ? 'text-white/40' : 'text-slate-400'}`}>{step.description}</p>
                 )}
               </div>
             </li>
