@@ -124,6 +124,13 @@ export function Stepper({
             const state = resolveState(step.id, currentStep, completedSteps, disabledSteps);
             const isCurrent = state === 'current';
             const isLast = idx === steps.length - 1;
+
+            // Connector below this step is "done" if this step itself is completed
+            const connectorDone = state === 'completed';
+            const connectorColor = dark
+              ? (connectorDone ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
+              : (connectorDone ? 'bg-brand-blue/50' : 'bg-slate-200');
+
             const labelColor: Record<StepState, string> = dark ? {
               completed: 'text-[#2D8ACA]',
               current:   'text-white font-bold',
@@ -135,25 +142,26 @@ export function Stepper({
               upcoming:  'text-slate-500',
               disabled:  'text-slate-300',
             };
-            const connectorColor = dark
-              ? (state === 'completed' ? 'bg-[#2D8ACA]/50' : 'bg-white/15')
-              : (state === 'completed' ? 'bg-brand-blue/50' : 'bg-slate-200');
+
             return (
               <li
                 key={step.id}
                 aria-current={isCurrent ? 'step' : undefined}
-                className="flex items-start gap-4 pb-8 last:pb-0"
+                className="flex items-stretch gap-4"
               >
-                <div className="relative flex flex-col items-center">
+                {/* Left column: circle + continuous connector line */}
+                <div className="relative flex w-9 shrink-0 flex-col items-center">
                   <StepCircle state={state} number={idx + 1} icon={step.icon} dark={dark} />
                   {!isLast && (
                     <div
-                      className={`mt-1 w-0.5 flex-1 min-h-[32px] ${connectorColor}`}
+                      className={`w-0.5 flex-1 ${connectorColor}`}
                       aria-hidden="true"
                     />
                   )}
                 </div>
-                <div className="min-w-0 flex-1 pt-1">
+
+                {/* Right column: label + spacing that matches connector height */}
+                <div className={`min-w-0 flex-1 pt-1 ${!isLast ? 'pb-6' : ''}`}>
                   <p className={`text-sm leading-tight ${labelColor[state]}`}>{step.label}</p>
                   {step.description && (
                     <p className={`mt-0.5 text-xs leading-tight ${dark ? 'text-white/40' : 'text-slate-400'}`}>{step.description}</p>
