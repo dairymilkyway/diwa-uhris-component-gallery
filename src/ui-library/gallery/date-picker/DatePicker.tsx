@@ -120,12 +120,19 @@ export function DatePicker({
 
   useEffect(() => {
     if (!isOpen) return;
-    function handleScroll() { setIsOpen(false); }
+    function handleScroll(e: Event) {
+      // Only close if the scroll originated outside our wrapper subtree.
+      // Scroll events from overflow-y-auto ancestors cause false positives
+      // when the browser auto-scrolls to focus the input — ignore those.
+      if (wrapperRef.current && wrapperRef.current.contains(e.target as Node)) return;
+      setIsOpen(false);
+    }
+    function handleResize() { setIsOpen(false); }
     window.addEventListener('scroll', handleScroll, { capture: true });
-    window.addEventListener('resize', handleScroll);
+    window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('scroll', handleScroll, { capture: true });
-      window.removeEventListener('resize', handleScroll);
+      window.removeEventListener('resize', handleResize);
     };
   }, [isOpen]);
 
@@ -133,7 +140,11 @@ export function DatePicker({
     if (!isOpen) return;
     function handleFocusOut(e: FocusEvent) {
       if (!e.relatedTarget) return;
-      if (wrapperRef.current && !wrapperRef.current.contains(e.relatedTarget as Node)) {
+      const target = e.relatedTarget as Node;
+      if (
+        wrapperRef.current && !wrapperRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
