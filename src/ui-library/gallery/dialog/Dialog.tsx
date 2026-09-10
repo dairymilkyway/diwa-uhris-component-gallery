@@ -145,7 +145,15 @@ export function Dialog({
           // Radix calls these before triggering onOpenChange, so preventing here
           // ensures neither the overlay nor keyboard can dismiss the dialog.
           onEscapeKeyDown={preventClose ? (e) => e.preventDefault() : onEscapeKeyDown}
-          onInteractOutside={preventClose ? (e) => e.preventDefault() : onInteractOutside}
+          onInteractOutside={(e) => {
+            const target = e.target as Element | null;
+            if (target?.closest('.pis-datepicker-popover')) {
+              e.preventDefault();
+              return;
+            }
+            if (preventClose) { e.preventDefault(); return; }
+            onInteractOutside?.(e);
+          }}
           onOpenAutoFocus={onOpenAutoFocus}
           onCloseAutoFocus={onCloseAutoFocus}
           // Remove padding added by className — override with our layout below

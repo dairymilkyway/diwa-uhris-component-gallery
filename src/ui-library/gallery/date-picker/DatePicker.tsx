@@ -37,6 +37,38 @@ const CALENDAR_WIDTH = 320;
 const POPOVER_WIDTH = CALENDAR_WIDTH + 32;
 const CALENDAR_HEIGHT = 360;
 
+function getScrollParent(el: Element | null): Element | null {
+  if (!el || el === document.body) return null;
+  const { overflowY, overflow } = getComputedStyle(el);
+  if (['auto', 'scroll'].includes(overflowY) || ['auto', 'scroll'].includes(overflow)) {
+    return el;
+  }
+  return getScrollParent(el.parentElement);
+}
+
+function computePopupStyle(rect: DOMRect): React.CSSProperties {
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const spaceAbove = rect.top;
+  const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
+    width: isNarrow ? `calc(100vw - 16px)` : undefined,
+  };
+  // Prefer below. Only go above if there's genuinely more space above AND
+  // the space below is less than 1/3 of the calendar height.
+  const goAbove = spaceAbove > spaceBelow && spaceBelow < CALENDAR_HEIGHT / 3;
+  if (goAbove) {
+    style.top = Math.max(8, rect.top - CALENDAR_HEIGHT - 6);
+  } else {
+    // Always place below the field — don't clamp upward even if it goes off-screen.
+    // The user can scroll to see the bottom of the calendar. Clamping upward
+    // makes the calendar appear above the field which is more confusing.
+    style.top = rect.bottom + 6;
+  }
+  return style;
+}
+
 export function DatePicker({
   value,
   onChange,
@@ -78,47 +110,25 @@ export function DatePicker({
   const skipNextOpen = useRef(false);
 
   const openPopup = useCallback(() => {
-    if (disabled || !wrapperRef.current) return;
+    if (disabled) return;
     if (skipNextOpen.current) {
       skipNextOpen.current = false;
       return;
     }
-    // Open with a sentinel style first, then reposition after render+scroll settles.
-    setPopupStyle({ position: 'fixed', top: -9999, left: -9999, visibility: 'hidden' });
-    setIsOpen(true);
-  }, [disabled]);
-
-  // Reposition the popover after it renders and any auto-scroll-to-focus settles.
-  // Using double-rAF ensures the browser has completed layout and scroll before
-  // we read getBoundingClientRect().
-  useEffect(() => {
-    if (!isOpen || !wrapperRef.current) return;
-    let frameId1: number;
-    let frameId2: number;
-    frameId1 = requestAnimationFrame(() => {
-      frameId2 = requestAnimationFrame(() => {
+    // Compute position BEFORE rendering the portal so we never flash at -9999.
+    // We use setTimeout(50) + rAF to let any auto-scroll-to-focus complete first,
+    // then read a stable getBoundingClientRect() and open with the correct position.
+    setTimeout(() => {
+      if (!wrapperRef.current) return;
+      requestAnimationFrame(() => {
         if (!wrapperRef.current) return;
         const rect = wrapperRef.current.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        const spaceAbove = rect.top;
-        const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
-        const style: React.CSSProperties = {
-          position: 'fixed',
-          visibility: 'visible',
-          left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
-          width: isNarrow ? `calc(100vw - 16px)` : undefined,
-        };
-        if (spaceBelow >= CALENDAR_HEIGHT || spaceBelow >= spaceAbove) {
-          style.top = rect.bottom + 6;
-        } else {
-          style.top = Math.max(8, rect.top - CALENDAR_HEIGHT - 6);
-        }
+        const style = computePopupStyle(rect);
         setPopupStyle(style);
+        setIsOpen(true);
       });
-    });
-    return () => { cancelAnimationFrame(frameId1); cancelAnimationFrame(frameId2); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+    }, 50);
+  }, [disabled]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -137,44 +147,18 @@ export function DatePicker({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Find the closest scrollable ancestor to attach the close-on-scroll listener.
-    // Using the scrollable ancestor (not window) avoids false-positive closes from
-    // window scroll events that fire during browser auto-scroll-to-focus.
-    function getScrollParent(el: Element | null): Element | null {
-      if (!el || el === document.body) return null;
-      const style = getComputedStyle(el);
-      if (['auto', 'scroll'].includes(style.overflowY) || ['auto', 'scroll'].includes(style.overflow)) {
-        return el;
-      }
-      return getScrollParent(el.parentElement);
-    }
-
+    // Attach scroll-close listeners. Position was already computed in openPopup
+    // before isOpen was set, so we don't need any delay here.
+    const close = () => setIsOpen(false);
     const scrollParent = getScrollParent(wrapperRef.current?.parentElement ?? null);
-
-    let scrollHandler: (() => void) | null = null;
-    let resizeHandler: (() => void) | null = null;
-
-    // Delay attaching the scroll listener by one frame so the browser's
-    // auto-scroll-to-focus (which fires synchronously on click/focus) completes
-    // before we start watching. Without this, the initial focus scroll closes
-    // the calendar immediately.
-    const frameId = requestAnimationFrame(() => {
-      scrollHandler = () => setIsOpen(false);
-      resizeHandler = () => setIsOpen(false);
-      if (scrollParent) {
-        scrollParent.addEventListener('scroll', scrollHandler, { passive: true });
-      }
-      window.addEventListener('scroll', scrollHandler, { capture: true, passive: true });
-      window.addEventListener('resize', resizeHandler);
-    });
+    if (scrollParent) scrollParent.addEventListener('scroll', close, { passive: true });
+    window.addEventListener('scroll', close, { capture: true, passive: true });
+    window.addEventListener('resize', close);
 
     return () => {
-      cancelAnimationFrame(frameId);
-      if (scrollHandler) {
-        if (scrollParent) scrollParent.removeEventListener('scroll', scrollHandler);
-        window.removeEventListener('scroll', scrollHandler, { capture: true });
-      }
-      if (resizeHandler) window.removeEventListener('resize', resizeHandler);
+      if (scrollParent) scrollParent.removeEventListener('scroll', close);
+      window.removeEventListener('scroll', close, { capture: true });
+      window.removeEventListener('resize', close);
     };
   }, [isOpen]);
 

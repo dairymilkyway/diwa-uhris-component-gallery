@@ -164,8 +164,8 @@ body {
 
 /* ── Date Picker (react-calendar DIWA theme) ─────────────────────────────── */
 .pis-datepicker-popover {
-  position: absolute;
   z-index: 1050;
+  pointer-events: auto;
   margin-top: 6px;
   background: #fff;
   border: 1px solid #dde3ec;

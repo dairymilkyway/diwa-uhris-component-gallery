@@ -169,7 +169,17 @@ export default function Modal({
           onOpenAutoFocus={onOpenAutoFocus}
           onCloseAutoFocus={onCloseAutoFocus}
           onEscapeKeyDown={preventClose ? (e) => e.preventDefault() : onEscapeKeyDown}
-          onInteractOutside={preventClose ? (e) => e.preventDefault() : onInteractOutside}
+          onInteractOutside={(e) => {
+            // Don't close the modal when the user interacts with a portaled
+            // DatePicker calendar (rendered in document.body outside this node).
+            const target = e.target as Element | null;
+            if (target?.closest('.pis-datepicker-popover')) {
+              e.preventDefault();
+              return;
+            }
+            if (preventClose) { e.preventDefault(); return; }
+            onInteractOutside?.(e);
+          }}
         >
           {/* Close button — only when preventClose is false */}
           {!preventClose && (
