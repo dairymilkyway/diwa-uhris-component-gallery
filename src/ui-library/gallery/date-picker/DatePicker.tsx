@@ -83,25 +83,32 @@ export function DatePicker({
       skipNextOpen.current = false;
       return;
     }
-    const rect = wrapperRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
+    // Delay rect capture by one frame so any browser auto-scroll-to-focus
+    // completes before we compute the position. Without this, the rect is
+    // captured before the scroll settles and the popover renders at the wrong
+    // position (e.g. off the top of the screen).
+    requestAnimationFrame(() => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
 
-    const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
-    const style: React.CSSProperties = {
-      position: 'fixed',
-      left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
-      width: isNarrow ? `calc(100vw - 16px)` : undefined,
-    };
+      const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
+      const style: React.CSSProperties = {
+        position: 'fixed',
+        left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
+        width: isNarrow ? `calc(100vw - 16px)` : undefined,
+      };
 
-    if (spaceBelow >= CALENDAR_HEIGHT || spaceBelow >= spaceAbove) {
-      style.top = rect.bottom + 6;
-    } else {
-      style.top = rect.top - CALENDAR_HEIGHT - 6;
-    }
+      if (spaceBelow >= CALENDAR_HEIGHT || spaceBelow >= spaceAbove) {
+        style.top = rect.bottom + 6;
+      } else {
+        style.top = Math.max(8, rect.top - CALENDAR_HEIGHT - 6);
+      }
 
-    setPopupStyle(style);
-    setIsOpen(true);
+      setPopupStyle(style);
+      setIsOpen(true);
+    });
   }, [disabled]);
 
   useEffect(() => {
