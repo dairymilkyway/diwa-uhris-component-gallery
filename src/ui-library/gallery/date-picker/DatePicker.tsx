@@ -120,19 +120,45 @@ export function DatePicker({
 
   useEffect(() => {
     if (!isOpen) return;
-    function handleScroll(e: Event) {
-      // Only close if the scroll originated outside our wrapper subtree.
-      // Scroll events from overflow-y-auto ancestors cause false positives
-      // when the browser auto-scrolls to focus the input — ignore those.
-      if (wrapperRef.current && wrapperRef.current.contains(e.target as Node)) return;
-      setIsOpen(false);
+
+    // Find the closest scrollable ancestor to attach the close-on-scroll listener.
+    // Using the scrollable ancestor (not window) avoids false-positive closes from
+    // window scroll events that fire during browser auto-scroll-to-focus.
+    function getScrollParent(el: Element | null): Element | null {
+      if (!el || el === document.body) return null;
+      const style = getComputedStyle(el);
+      if (['auto', 'scroll'].includes(style.overflowY) || ['auto', 'scroll'].includes(style.overflow)) {
+        return el;
+      }
+      return getScrollParent(el.parentElement);
     }
-    function handleResize() { setIsOpen(false); }
-    window.addEventListener('scroll', handleScroll, { capture: true });
-    window.addEventListener('resize', handleResize);
+
+    const scrollParent = getScrollParent(wrapperRef.current?.parentElement ?? null);
+
+    let scrollHandler: (() => void) | null = null;
+    let resizeHandler: (() => void) | null = null;
+
+    // Delay attaching the scroll listener by one frame so the browser's
+    // auto-scroll-to-focus (which fires synchronously on click/focus) completes
+    // before we start watching. Without this, the initial focus scroll closes
+    // the calendar immediately.
+    const frameId = requestAnimationFrame(() => {
+      scrollHandler = () => setIsOpen(false);
+      resizeHandler = () => setIsOpen(false);
+      if (scrollParent) {
+        scrollParent.addEventListener('scroll', scrollHandler, { passive: true });
+      }
+      window.addEventListener('scroll', scrollHandler, { capture: true, passive: true });
+      window.addEventListener('resize', resizeHandler);
+    });
+
     return () => {
-      window.removeEventListener('scroll', handleScroll, { capture: true });
-      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(frameId);
+      if (scrollHandler) {
+        if (scrollParent) scrollParent.removeEventListener('scroll', scrollHandler);
+        window.removeEventListener('scroll', scrollHandler, { capture: true });
+      }
+      if (resizeHandler) window.removeEventListener('resize', resizeHandler);
     };
   }, [isOpen]);
 
