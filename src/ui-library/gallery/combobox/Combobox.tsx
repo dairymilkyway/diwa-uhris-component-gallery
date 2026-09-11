@@ -95,6 +95,11 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
       left: rect.left,
       zIndex: 9999,
       width: rect.width,
+      // Radix Dialog sets pointer-events:none on <body> while open.
+      // The portal renders into body and inherits it — restore interactivity here.
+      pointerEvents: 'auto',
+      // Prevent wheel events from escaping to the locked body scroll container.
+      overscrollBehavior: 'contain',
     });
   }, [isOpen]);
 
@@ -205,6 +210,14 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
         <div ref={listRef} id={listboxId} role="listbox"
           style={panelStyle}
           className="bg-white border border-slate-200 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+          onWheel={(e) => {
+            // Explicitly scroll the list on wheel — needed when Radix Dialog has
+            // pointer-events:none on body, which can prevent wheel event delivery.
+            if (listRef.current) {
+              listRef.current.scrollTop += e.deltaY;
+              e.stopPropagation();
+            }
+          }}
         >
           {error ? (
             <div className="px-3 py-2 text-sm text-rose-500 font-semibold">{error}</div>
