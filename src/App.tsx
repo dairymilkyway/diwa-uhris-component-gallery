@@ -51,6 +51,9 @@ const SpinnerPage         = lazy(() => import('./ui-library/gallery/spinner/Spin
 const SkeletonPage        = lazy(() => import('./ui-library/gallery/skeleton/SkeletonPage'));
 const EmptyStatePage      = lazy(() => import('./ui-library/gallery/empty-state/EmptyStatePage'));
 const StatusPagePage      = lazy(() => import('./ui-library/gallery/status-page/StatusPagePage'));
+const NotFoundErrorPage   = lazy(() => import('./ui-library/gallery/not-found-error/NotFoundErrorPage'));
+const ForbiddenErrorPage  = lazy(() => import('./ui-library/gallery/forbidden-error/ForbiddenErrorPage'));
+const ApplicationErrorPage = lazy(() => import('./ui-library/gallery/application-error/ApplicationErrorPage'));
 const StatCardPage        = lazy(() => import('./ui-library/gallery/stat-card/StatCardPage'));
 const DescriptionListPage = lazy(() => import('./ui-library/gallery/description-list/DescriptionListPage'));
 const StatusBadgePage     = lazy(() => import('./ui-library/gallery/status-badge/StatusBadgePage'));
@@ -171,6 +174,9 @@ const router = createBrowserRouter([
   { path: '/ui-library/skeleton',          element: <SkeletonPage /> },
   { path: '/ui-library/empty-state',       element: <EmptyStatePage /> },
   { path: '/ui-library/status-page',       element: <StatusPagePage /> },
+  { path: '/ui-library/not-found-error',   element: <NotFoundErrorPage /> },
+  { path: '/ui-library/forbidden-error',   element: <ForbiddenErrorPage /> },
+  { path: '/ui-library/application-error', element: <ApplicationErrorPage /> },
   { path: '/ui-library/statistic',         element: <StatCardPage /> },
   { path: '/ui-library/description-list',  element: <DescriptionListPage /> },
   { path: '/ui-library/status-badge',      element: <StatusBadgePage /> },

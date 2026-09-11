@@ -178,6 +178,15 @@ export type { EmptyStateProps } from './gallery/empty-state/EmptyState';
 export { StatusPage, STATUS_PAGE_PRESETS } from './gallery/status-page/StatusPage';
 export type { StatusPageProps, StatusPageAction } from './gallery/status-page/StatusPage';
 
+export { NotFoundError } from './gallery/not-found-error/NotFoundError';
+export type { NotFoundErrorProps } from './gallery/not-found-error/NotFoundError';
+
+export { ForbiddenError } from './gallery/forbidden-error/ForbiddenError';
+export type { ForbiddenErrorProps } from './gallery/forbidden-error/ForbiddenError';
+
+export { ApplicationError, ApplicationErrorFallback } from './gallery/application-error/ApplicationError';
+export type { ApplicationErrorProps, ApplicationErrorFallbackProps } from './gallery/application-error/ApplicationError';
+
 export { EmployeeCard } from './gallery/employee-card/EmployeeCard';
 export type { EmployeeCardProps, EmployeeCardMeta } from './gallery/employee-card/EmployeeCard';
 
