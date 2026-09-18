@@ -118,12 +118,11 @@ export function Menu({
     reposition();
     const raf = window.requestAnimationFrame(reposition);
 
-    // Track the trigger while any ancestor scrolls or the window resizes.
-    window.addEventListener('scroll', reposition, true);
+    // Reposition on resize (layout change without the trigger scrolling away).
+    // Scroll is handled by the dismiss effect below (it closes the menu).
     window.addEventListener('resize', reposition);
     return () => {
       window.cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
   }, [open, align, items.length]);
@@ -154,9 +153,17 @@ export function Menu({
         btn?.focus();
       }
     };
+    // Close on scroll of any ancestor. The panel is a fixed-position portal, so
+    // once the trigger scrolls under sticky/higher-layered content the panel
+    // would otherwise float over unrelated UI. Ignore scrolls inside the panel.
+    const handleScroll = (e: Event) => {
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
 
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll, true);
     // Focus first non-disabled item on open
     window.setTimeout(() => {
       const first = itemRefs.current.find((r) => r && !r.disabled);
@@ -166,6 +173,7 @@ export function Menu({
     return () => {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [open]);
 
