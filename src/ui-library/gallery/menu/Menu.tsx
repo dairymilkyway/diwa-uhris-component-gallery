@@ -79,19 +79,54 @@ export function Menu({
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
 
-  // Compute portal panel position from trigger bounding rect
+  // Compute portal panel position from trigger bounding rect.
+  // Flips the panel above the trigger when there isn't room below (e.g. lower
+  // table rows), so it never overflows past the viewport / behind the taskbar.
   useEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
+
+    const GAP = 4;
+    const MARGIN = 8; // keep clear of the very edge / taskbar
     const PANEL_MIN_WIDTH = 176; // min-w-[11rem]
-    setPanelStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: align === 'left' ? rect.left : Math.max(0, rect.right - PANEL_MIN_WIDTH),
-      zIndex: 9999,
-      minWidth: Math.max(rect.width, PANEL_MIN_WIDTH),
-    });
-  }, [open, align]);
+    const ROW_HEIGHT = 36; // ~py-2 + text; used to estimate height before first paint
+    const HEADER_HEIGHT = 8; // py-1 top+bottom padding
+
+    const reposition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const panelHeight =
+        panelRef.current?.offsetHeight ?? items.length * ROW_HEIGHT + HEADER_HEIGHT;
+
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = spaceBelow < panelHeight + GAP + MARGIN && rect.top > spaceBelow;
+
+      setPanelStyle({
+        position: 'fixed',
+        // When flipping up, anchor to the bottom so the panel grows upward and
+        // its height is irrelevant to the top edge staying on-screen.
+        ...(flipUp
+          ? { bottom: Math.max(MARGIN, window.innerHeight - rect.top + GAP) }
+          : { top: rect.bottom + GAP }),
+        left: align === 'left' ? rect.left : Math.max(MARGIN, rect.right - PANEL_MIN_WIDTH),
+        zIndex: 9999,
+        minWidth: Math.max(rect.width, PANEL_MIN_WIDTH),
+      });
+    };
+
+    // Run once now (estimated height), then again after paint (measured height).
+    reposition();
+    const raf = window.requestAnimationFrame(reposition);
+
+    // Track the trigger while any ancestor scrolls or the window resizes.
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open, align, items.length]);
 
   // ── Outside click and Escape ────────────────────────────────────────────────
   useEffect(() => {
