@@ -2,9 +2,15 @@
  * Menu — Design System Component
  *
  * A dropdown menu anchored to a trigger. Opens on trigger click,
- * closes on outside-click or Escape. Full keyboard navigation:
- * ArrowDown/ArrowUp to move between items, Home/End for first/last,
- * Escape to close.
+ * closes on outside-click, Escape, or scroll. Full keyboard navigation:
+ * ArrowDown/ArrowUp move between items (skipping disabled), Home/End jump to
+ * the first/last enabled item, Escape closes. When focus is on a closed
+ * trigger, Enter/Space/ArrowDown open it and focus the first item; ArrowUp
+ * opens it and focuses the last item.
+ *
+ * The panel renders in a body portal with fixed positioning: it flips above
+ * the trigger when there isn't room below, and clamps horizontally so it never
+ * overflows the viewport.
  *
  * Follows WAI-ARIA Menu Button pattern:
  *   - trigger: role="button", aria-haspopup="menu", aria-expanded
@@ -28,6 +34,12 @@ import { cn } from '../../../lib/utils';
 export type MenuItemTone = 'default' | 'danger';
 
 export interface MenuItem {
+  /**
+   * Stable identity for the item. Used for the React key and focus tracking.
+   * Recommended when labels can repeat or the item list is dynamic; falls back
+   * to `label` then index when omitted.
+   */
+  id?: string;
   label: string;
   icon?: ReactNode;
   onClick: () => void;
@@ -52,6 +64,11 @@ export interface MenuProps {
   open?: boolean;
   /** Called when the menu should open or close. */
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Close the menu after an item is selected. Default `true`.
+   * Set `false` for menus that stay open across clicks (e.g. multi-toggle filters).
+   */
+  closeOnSelect?: boolean;
   /** Additional class on the floating panel. */
   panelClassName?: string;
 }
@@ -63,6 +80,7 @@ export function Menu({
   align = 'right',
   open: controlledOpen,
   onOpenChange,
+  closeOnSelect = true,
   panelClassName = '',
 }: MenuProps) {
   const [internalOpen, setInternalOpen] = useState(false);
@@ -78,6 +96,8 @@ export function Menu({
   const panelRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
+  // After opening via keyboard, which end to focus: 'first' | 'last'.
+  const pendingFocusRef = useRef<'first' | 'last'>('first');
 
   // Compute portal panel position from trigger bounding rect.
   // Flips the panel above the trigger when there isn't room below (e.g. lower
@@ -101,6 +121,13 @@ export function Menu({
       const spaceBelow = window.innerHeight - rect.bottom;
       const flipUp = spaceBelow < panelHeight + GAP + MARGIN && rect.top > spaceBelow;
 
+      // Horizontal: start from the requested alignment, then clamp so the panel
+      // never overflows either edge of the viewport.
+      const panelWidth = Math.max(panelRef.current?.offsetWidth ?? 0, rect.width, PANEL_MIN_WIDTH);
+      const desiredLeft = align === 'left' ? rect.left : rect.right - panelWidth;
+      const maxLeft = window.innerWidth - panelWidth - MARGIN;
+      const left = Math.min(Math.max(MARGIN, desiredLeft), Math.max(MARGIN, maxLeft));
+
       setPanelStyle({
         position: 'fixed',
         // When flipping up, anchor to the bottom so the panel grows upward and
@@ -108,7 +135,7 @@ export function Menu({
         ...(flipUp
           ? { bottom: Math.max(MARGIN, window.innerHeight - rect.top + GAP) }
           : { top: rect.bottom + GAP }),
-        left: align === 'left' ? rect.left : Math.max(MARGIN, rect.right - PANEL_MIN_WIDTH),
+        left,
         zIndex: 9999,
         minWidth: Math.max(rect.width, PANEL_MIN_WIDTH),
       });
@@ -164,10 +191,15 @@ export function Menu({
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
     window.addEventListener('scroll', handleScroll, true);
-    // Focus first non-disabled item on open
+    // Focus the first (or last, when opened via ArrowUp) non-disabled item.
     window.setTimeout(() => {
-      const first = itemRefs.current.find((r) => r && !r.disabled);
-      first?.focus();
+      const refs = itemRefs.current;
+      const enabled = refs
+        .map((node, i) => ({ node, i }))
+        .filter((x) => x.node && !x.node.disabled);
+      const target = pendingFocusRef.current === 'last' ? enabled[enabled.length - 1] : enabled[0];
+      target?.node?.focus();
+      pendingFocusRef.current = 'first';
     }, 0);
 
     return () => {
@@ -177,24 +209,47 @@ export function Menu({
     };
   }, [open]);
 
-  const focusItem = (index: number) => {
-    const next = ((index % items.length) + items.length) % items.length;
-    itemRefs.current[next]?.focus();
+  // Move focus to the next enabled item starting at `index`, stepping by `dir`
+  // (+1/-1) and wrapping. Skips disabled items so Arrow keys never "stick".
+  const focusFrom = (index: number, dir: 1 | -1) => {
+    const n = items.length;
+    if (n === 0) return;
+    for (let step = 0; step < n; step++) {
+      const next = (((index + dir * step) % n) + n) % n;
+      const node = itemRefs.current[next];
+      if (node && !node.disabled) {
+        node.focus();
+        return;
+      }
+    }
   };
 
   const handleItemKeyDown = (e: React.KeyboardEvent, index: number) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      focusItem(index + 1);
+      focusFrom(index + 1, 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      focusItem(index - 1);
+      focusFrom(index - 1, -1);
     } else if (e.key === 'Home') {
       e.preventDefault();
-      focusItem(0);
+      focusFrom(0, 1);
     } else if (e.key === 'End') {
       e.preventDefault();
-      focusItem(items.length - 1);
+      focusFrom(items.length - 1, -1);
+    }
+  };
+
+  const handleTriggerKeyDown = (e: React.KeyboardEvent) => {
+    if (open) return;
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+      e.preventDefault();
+      pendingFocusRef.current = 'first';
+      setOpen(true);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      pendingFocusRef.current = 'last';
+      setOpen(true);
     }
   };
 
@@ -204,6 +259,7 @@ export function Menu({
       <div
         ref={triggerRef}
         onClick={() => setOpen(!open)}
+        onKeyDown={handleTriggerKeyDown}
         className="cursor-pointer"
       >
         {isValidElement(trigger)
@@ -228,13 +284,13 @@ export function Menu({
         >
           {items.map((item, index) => (
             <button
-              key={item.label}
+              key={item.id ?? item.label ?? index}
               ref={(node) => { itemRefs.current[index] = node; }}
               type="button"
               role="menuitem"
               disabled={item.disabled}
               onClick={() => {
-                setOpen(false);
+                if (closeOnSelect) setOpen(false);
                 item.onClick();
               }}
               onKeyDown={(e) => handleItemKeyDown(e, index)}
