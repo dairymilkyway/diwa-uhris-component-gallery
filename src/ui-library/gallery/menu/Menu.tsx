@@ -121,12 +121,17 @@ export function Menu({
       const spaceBelow = window.innerHeight - rect.bottom;
       const flipUp = spaceBelow < panelHeight + GAP + MARGIN && rect.top > spaceBelow;
 
-      // Horizontal: start from the requested alignment, then clamp so the panel
-      // never overflows either edge of the viewport.
-      const panelWidth = Math.max(panelRef.current?.offsetWidth ?? 0, rect.width, PANEL_MIN_WIDTH);
-      const desiredLeft = align === 'left' ? rect.left : rect.right - panelWidth;
-      const maxLeft = window.innerWidth - panelWidth - MARGIN;
-      const left = Math.min(Math.max(MARGIN, desiredLeft), Math.max(MARGIN, maxLeft));
+      // Horizontal: anchor by the trigger's aligned EDGE rather than deriving
+      // `left` from the panel width. This mirrors the vertical flip (anchored by
+      // `bottom`): the browser lays the panel out from a fixed edge, so a
+      // transient/stale width measurement can never push it to the far-left edge
+      // — which caused the menu to "randomly" open at the very left. `maxWidth`
+      // keeps a wide panel inside the viewport.
+      const available = window.innerWidth - MARGIN * 2;
+      const horizontal: React.CSSProperties =
+        align === 'left'
+          ? { left: Math.max(MARGIN, Math.min(rect.left, window.innerWidth - MARGIN)), right: 'auto' }
+          : { right: Math.max(MARGIN, window.innerWidth - rect.right), left: 'auto' };
 
       setPanelStyle({
         position: 'fixed',
@@ -135,9 +140,10 @@ export function Menu({
         ...(flipUp
           ? { bottom: Math.max(MARGIN, window.innerHeight - rect.top + GAP) }
           : { top: rect.bottom + GAP }),
-        left,
+        ...horizontal,
         zIndex: 9999,
-        minWidth: Math.max(rect.width, PANEL_MIN_WIDTH),
+        minWidth: PANEL_MIN_WIDTH,
+        maxWidth: available,
       });
     };
 
