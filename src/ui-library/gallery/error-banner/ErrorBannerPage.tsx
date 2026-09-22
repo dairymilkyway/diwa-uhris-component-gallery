@@ -115,9 +115,14 @@ export default function ErrorBannerPage() {
         {/* API */}
         <GallerySection id="api" title="API Reference">
           <ApiTable props={[
-            { name: 'message',   type: 'ReactNode', required: true, description: 'Banner content. Usually a string; accepts JSX for links or emphasis.' },
-            { name: 'tone',      type: "'error' | 'warning' | 'info'", default: "'error'", description: "error: rose + role='alert'. warning/info: amber/sky + aria-live='polite'." },
-            { name: 'className', type: 'string',    description: 'Additional class on the banner div.' },
+            { name: 'message',      type: 'ReactNode', required: true, description: 'Banner content. Usually a string; accepts JSX for links or emphasis.' },
+            { name: 'title',        type: 'ReactNode', description: 'Optional bold heading rendered above the message.' },
+            { name: 'tone',         type: "'error' | 'warning' | 'info'", default: "'error'", description: "error: rose + role='alert'. warning/info: amber/sky + aria-live='polite'." },
+            { name: 'icon',         type: 'ReactNode', description: 'Optional leading icon rendered before the text.' },
+            { name: 'action',       type: 'ReactNode', description: 'Optional trailing action (e.g. a Retry button) rendered before the close button.' },
+            { name: 'onDismiss',    type: '() => void', description: 'When provided, renders a close button that invokes this handler.' },
+            { name: 'dismissLabel', type: 'string',    default: "'Dismiss'", description: 'Accessible label for the close button.' },
+            { name: 'className',    type: 'string',    description: 'Additional class on the banner div.' },
           ]} />
         </GallerySection>
 
