@@ -13,7 +13,7 @@ import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import Calendar from 'react-calendar';
 import { format, parse, isValid } from 'date-fns';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useFieldContext } from '../field/FieldContext';
 import { cn } from '../../../lib/utils';
 
@@ -31,6 +31,26 @@ interface DatePickerProps {
   'aria-label'?: string;
   'aria-labelledby'?: string;
   required?: boolean;
+  /**
+   * date-fns format string for the text shown in the trigger.
+   * The committed `onChange` value is always ISO `yyyy-MM-dd` regardless of this.
+   * Default: 'MMM d, yyyy'.
+   */
+  dateFormat?: string;
+  /** Show a clear (×) button that resets the value to '' when a date is set. */
+  clearable?: boolean;
+  /** Notified whenever the calendar popover opens or closes. */
+  onOpenChange?: (open: boolean) => void;
+  /**
+   * Popover placement relative to the trigger.
+   * 'auto' (default) flips above/below based on viewport space;
+   * 'below'/'above' force a side (still clamped to stay on-screen).
+   */
+  placement?: 'auto' | 'below' | 'above';
+  /** BCP-47 locale forwarded to the calendar (e.g. 'en-US', 'fr-FR'). */
+  locale?: string;
+  /** Name forwarded to the trigger input for form association. */
+  name?: string;
 }
 
 const CALENDAR_WIDTH = 320;
@@ -46,7 +66,10 @@ function getScrollParent(el: Element | null): Element | null {
   return getScrollParent(el.parentElement);
 }
 
-function computePopupStyle(rect: DOMRect): React.CSSProperties {
+export function computePopupStyle(
+  rect: DOMRect,
+  placement: 'auto' | 'below' | 'above' = 'auto',
+): React.CSSProperties {
   const spaceBelow = window.innerHeight - rect.bottom;
   const spaceAbove = rect.top;
   const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
@@ -55,16 +78,19 @@ function computePopupStyle(rect: DOMRect): React.CSSProperties {
     left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
     width: isNarrow ? `calc(100vw - 16px)` : undefined,
   };
-  // Prefer below. Only go above if there's genuinely more space above AND
-  // the space below is less than 1/3 of the calendar height.
-  const goAbove = spaceAbove > spaceBelow && spaceBelow < CALENDAR_HEIGHT / 3;
-  if (goAbove) {
-    style.top = Math.max(8, rect.top - CALENDAR_HEIGHT - 6);
+  // Decide side: forced placement wins; otherwise prefer below unless there's
+  // clearly more room above. Either way the top is clamped so the calendar
+  // never runs off the top or bottom of the viewport (min 8px gap).
+  const placeBelow =
+    placement === 'below'
+      ? true
+      : placement === 'above'
+        ? false
+        : spaceBelow >= CALENDAR_HEIGHT || spaceBelow >= spaceAbove;
+  if (placeBelow) {
+    style.top = Math.min(rect.bottom + 6, window.innerHeight - CALENDAR_HEIGHT - 8);
   } else {
-    // Always place below the field — don't clamp upward even if it goes off-screen.
-    // The user can scroll to see the bottom of the calendar. Clamping upward
-    // makes the calendar appear above the field which is more confusing.
-    style.top = rect.bottom + 6;
+    style.top = Math.max(rect.top - CALENDAR_HEIGHT - 6, 8);
   }
   return style;
 }
@@ -82,13 +108,30 @@ export function DatePicker({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledBy,
   required,
+  dateFormat = 'MMM d, yyyy',
+  clearable = false,
+  onOpenChange,
+  placement = 'auto',
+  locale,
+  name,
 }: DatePickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpenState] = useState(false);
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const internalId = useId();
+
+  // Wrap the raw state setter so every open/close notifies onOpenChange.
+  const setIsOpen = useCallback(
+    (next: boolean) => {
+      setIsOpenState((prev) => {
+        if (prev !== next) onOpenChange?.(next);
+        return next;
+      });
+    },
+    [onOpenChange],
+  );
 
   const ctx = useFieldContext();
   const inputId          = id       ?? ctx?.inputId  ?? internalId;
@@ -105,7 +148,7 @@ export function DatePicker({
       })()
     : undefined;
 
-  const displayValue = selectedDate ? format(selectedDate, 'MMM d, yyyy') : '';
+  const displayValue = selectedDate ? format(selectedDate, dateFormat) : '';
 
   const skipNextOpen = useRef(false);
 
@@ -123,12 +166,12 @@ export function DatePicker({
       requestAnimationFrame(() => {
         if (!wrapperRef.current) return;
         const rect = wrapperRef.current.getBoundingClientRect();
-        const style = computePopupStyle(rect);
+        const style = computePopupStyle(rect, placement);
         setPopupStyle(style);
         setIsOpen(true);
       });
     }, 50);
-  }, [disabled]);
+  }, [disabled, placement, setIsOpen]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -208,6 +251,7 @@ export function DatePicker({
         <input
           ref={inputRef}
           id={inputId}
+          name={name}
           type="text"
           readOnly
           value={displayValue}
@@ -226,11 +270,31 @@ export function DatePicker({
           role="combobox"
           className={inputClasses}
         />
-        <CalendarDays
-          size={16}
-          className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isOpen ? 'text-brand-blue' : 'text-slate-300'}`}
-          aria-hidden="true"
-        />
+        {clearable && value && !disabled ? (
+          <button
+            type="button"
+            aria-label="Clear date"
+            onMouseDown={(e) => {
+              // Prevent the input's focus/open handlers from firing on this click.
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={() => {
+              onChange('');
+              setIsOpen(false);
+              inputRef.current?.focus();
+            }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30"
+          >
+            <X size={14} />
+          </button>
+        ) : (
+          <CalendarDays
+            size={16}
+            className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${isOpen ? 'text-brand-blue' : 'text-slate-300'}`}
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {isOpen && !disabled && createPortal(
@@ -256,6 +320,7 @@ export function DatePicker({
             defaultActiveStartDate={selectedDate ?? minDate}
             minDate={minDate}
             maxDate={maxDate}
+            locale={locale}
             defaultView="month"
             showNeighboringDecade={true}
             showNeighboringCentury={true}

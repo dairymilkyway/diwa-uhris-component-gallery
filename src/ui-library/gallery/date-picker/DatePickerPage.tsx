@@ -53,6 +53,30 @@ function DisabledExample() {
   );
 }
 
+function ClearableExample() {
+  const [date, setDate] = useState('2025-06-01');
+  return (
+    <DatePicker
+      value={date}
+      onChange={setDate}
+      clearable
+      placeholder="Pick a date to clear…"
+    />
+  );
+}
+
+function CustomFormatExample() {
+  const [date, setDate] = useState('2025-06-01');
+  return (
+    <DatePicker
+      value={date}
+      onChange={setDate}
+      dateFormat="EEE, dd MMM yyyy"
+      placeholder="Select a date…"
+    />
+  );
+}
+
 function MinDateExample() {
   const [date, setDate] = useState('');
   const today = new Date();
@@ -145,6 +169,21 @@ const today = new Date();
   onChange={() => {}}
   disabled
 />`,
+
+  clearable: `// clearable shows a × button that resets the value to ''
+<DatePicker
+  value={date}
+  onChange={setDate}
+  clearable
+  placeholder="Pick a date to clear…"
+/>`,
+
+  customFormat: `// dateFormat customizes the trigger text (value stays ISO yyyy-MM-dd)
+<DatePicker
+  value={date}
+  onChange={setDate}
+  dateFormat="EEE, dd MMM yyyy"
+/>`,
 };
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -218,6 +257,18 @@ export default function DatePickerPage() {
               <DisabledExample />
             </div>
           </Showcase>
+          <Showcase code={CODE.clearable} language="tsx" title="Clearable">
+            <p className="mb-3 text-sm text-slate-600">Adds a × button to reset the value to an empty string.</p>
+            <div className="w-64">
+              <ClearableExample />
+            </div>
+          </Showcase>
+          <Showcase code={CODE.customFormat} language="tsx" title="Custom display format">
+            <p className="mb-3 text-sm text-slate-600">Change the trigger text with any date-fns format. The committed value is always ISO.</p>
+            <div className="w-64">
+              <CustomFormatExample />
+            </div>
+          </Showcase>
         </GallerySection>
 
         {/* Accessibility ── */}
@@ -275,6 +326,12 @@ export default function DatePickerPage() {
             { name: 'aria-label',      type: 'string',                 description: 'Accessible label when no visible label is present.' },
             { name: 'aria-labelledby', type: 'string',                 description: 'ID of an external label element.' },
             { name: 'required',        type: 'boolean',    default: 'false', description: 'Sets aria-required on the trigger (also consumed from FieldContext).' },
+            { name: 'dateFormat',      type: 'string',     default: "'MMM d, yyyy'", description: 'date-fns format for the trigger text. The committed value stays ISO yyyy-MM-dd.' },
+            { name: 'clearable',       type: 'boolean',    default: 'false', description: 'Shows a clear (×) button that resets the value to an empty string.' },
+            { name: 'onOpenChange',    type: '(open: boolean) => void', description: 'Called whenever the calendar popover opens or closes.' },
+            { name: 'placement',       type: "'auto' | 'below' | 'above'", default: "'auto'", description: 'Force the popover side. Auto flips based on viewport space; all modes stay clamped on-screen.' },
+            { name: 'locale',          type: 'string',     description: "BCP-47 locale forwarded to the calendar (e.g. 'fr-FR')." },
+            { name: 'name',            type: 'string',     description: 'Name forwarded to the trigger input for form association.' },
             { name: 'className',       type: 'string',                 description: 'Additional CSS classes on the trigger input.' },
           ]} />
         </GallerySection>
