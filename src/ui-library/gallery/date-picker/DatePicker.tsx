@@ -9,7 +9,7 @@
  * position:fixed works correctly even when the DatePicker is inside a
  * CSS transform context (e.g. a Modal with -translate-x/y centering).
  */
-import { useState, useRef, useEffect, useCallback, useId } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import Calendar from 'react-calendar';
 import { format, parse, isValid } from 'date-fns';
@@ -156,6 +156,10 @@ export function DatePicker({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const isOpen = isControlled ? open : uncontrolledOpen;
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
+  // Gates popover visibility until the layout effect has measured its real
+  // height and computed the final position. Prevents the visible "open below,
+  // then flip up" jump that a post-paint reposition would cause.
+  const [positioned, setPositioned] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -212,21 +216,28 @@ export function DatePicker({
         const rect = wrapperRef.current.getBoundingClientRect();
         const style = computePopupStyle(rect, placement);
         setPopupStyle(style);
+        setPositioned(false);
         setIsOpen(true);
       });
     }, 50);
   }, [disabled, readOnly, placement, setIsOpen]);
 
-  // Once the popover is mounted, recompute the position using its real height.
-  // The first pass in openPopup uses the CALENDAR_HEIGHT over-estimate; the
-  // month view actually renders ~285px, so re-running with the measured height
-  // removes the gap when flipped above and avoids flipping above when the
-  // shorter calendar would have fit below.
-  useEffect(() => {
-    if (!isOpen || !popoverRef.current || !wrapperRef.current) return;
+  // Before the browser paints the open popover, measure its real height and
+  // compute the final position, then reveal it. Runs as a layout effect so the
+  // measure→reposition happens in the same frame the popover mounts — the user
+  // never sees it open in one spot and jump to another. The first pass in
+  // openPopup uses the CALENDAR_HEIGHT over-estimate purely to size the initial
+  // (hidden) render; the real height (~285px month view) drives what's shown.
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setPositioned(false);
+      return;
+    }
+    if (!popoverRef.current || !wrapperRef.current) return;
     const measuredHeight = popoverRef.current.offsetHeight;
     const rect = wrapperRef.current.getBoundingClientRect();
     setPopupStyle(computePopupStyle(rect, placement, measuredHeight));
+    setPositioned(true);
   }, [isOpen, placement]);
 
   useEffect(() => {
@@ -358,7 +369,7 @@ export function DatePicker({
         <div
           ref={popoverRef}
           className="pis-datepicker-popover"
-          style={popupStyle}
+          style={{ ...popupStyle, visibility: positioned ? undefined : 'hidden' }}
           role="dialog"
           aria-label={ariaLabel ? `${ariaLabel} calendar` : 'Date picker'}
           aria-modal="false"
