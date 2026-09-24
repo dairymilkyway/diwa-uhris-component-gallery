@@ -51,6 +51,26 @@ interface DatePickerProps {
   locale?: string;
   /** Name forwarded to the trigger input for form association. */
   name?: string;
+  /**
+   * Per-day predicate to disable individual dates that min/maxDate can't express
+   * (weekends, holidays, already-booked days). Return true to disable the date.
+   * Only consulted on the day (month) view.
+   */
+  isDateDisabled?: (date: Date) => boolean;
+  /**
+   * Read-only: the value is shown but the calendar can't be opened and no date
+   * can be picked. Unlike `disabled`, it keeps normal (non-greyed) styling for
+   * view/detail screens.
+   */
+  readOnly?: boolean;
+  /**
+   * Controlled open state. When provided, the component no longer manages its
+   * own open/close — the parent owns it via `onOpenChange`. Leave undefined for
+   * the default uncontrolled behavior.
+   */
+  open?: boolean;
+  /** Initial open state when uncontrolled. Ignored when `open` is provided. */
+  defaultOpen?: boolean;
 }
 
 const CALENDAR_WIDTH = 320;
@@ -69,7 +89,17 @@ function getScrollParent(el: Element | null): Element | null {
 export function computePopupStyle(
   rect: DOMRect,
   placement: 'auto' | 'below' | 'above' = 'auto',
+  // Actual rendered popover height once mounted. Before the first measurement
+  // we fall back to CALENDAR_HEIGHT (a deliberate over-estimate) so the initial
+  // paint never overflows; the component re-runs this with the real height on
+  // the next frame. Using the real height matters because the month view is
+  // only ~285px tall — assuming 360px both (a) flips above too eagerly when the
+  // shorter calendar would fit below and (b) leaves a visible gap above the
+  // trigger, since the above-placement anchors to a 360px slot the calendar
+  // doesn't fill.
+  measuredHeight?: number,
 ): React.CSSProperties {
+  const height = measuredHeight ?? CALENDAR_HEIGHT;
   const spaceBelow = window.innerHeight - rect.bottom;
   const spaceAbove = rect.top;
   const isNarrow = window.innerWidth < POPOVER_WIDTH + 16;
@@ -78,19 +108,22 @@ export function computePopupStyle(
     left: isNarrow ? 8 : Math.max(8, Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 8)),
     width: isNarrow ? `calc(100vw - 16px)` : undefined,
   };
-  // Decide side: forced placement wins; otherwise prefer below unless there's
-  // clearly more room above. Either way the top is clamped so the calendar
-  // never runs off the top or bottom of the viewport (min 8px gap).
+  // Decide side: forced placement wins; otherwise prefer below unless the
+  // calendar doesn't fit below AND there's more room above. Either way the top
+  // is clamped so the calendar never runs off the top or bottom of the viewport
+  // (min 8px gap).
   const placeBelow =
     placement === 'below'
       ? true
       : placement === 'above'
         ? false
-        : spaceBelow >= CALENDAR_HEIGHT || spaceBelow >= spaceAbove;
+        : spaceBelow >= height || spaceBelow >= spaceAbove;
   if (placeBelow) {
-    style.top = Math.min(rect.bottom + 6, window.innerHeight - CALENDAR_HEIGHT - 8);
+    style.top = Math.min(rect.bottom + 6, window.innerHeight - height - 8);
   } else {
-    style.top = Math.max(rect.top - CALENDAR_HEIGHT - 6, 8);
+    // Anchor to the real height so the calendar sits just above the trigger
+    // (6px gap) instead of floating at a fixed 360px offset.
+    style.top = Math.max(rect.top - height - 6, 8);
   }
   return style;
 }
@@ -114,23 +147,34 @@ export function DatePicker({
   placement = 'auto',
   locale,
   name,
+  isDateDisabled,
+  readOnly = false,
+  open,
+  defaultOpen = false,
 }: DatePickerProps) {
-  const [isOpen, setIsOpenState] = useState(false);
+  const isControlled = open !== undefined;
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const isOpen = isControlled ? open : uncontrolledOpen;
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const internalId = useId();
 
-  // Wrap the raw state setter so every open/close notifies onOpenChange.
+  // Wrap the setter so every open/close notifies onOpenChange. When controlled,
+  // we only notify — the parent owns the state and must reflect it back via `open`.
   const setIsOpen = useCallback(
     (next: boolean) => {
-      setIsOpenState((prev) => {
+      if (isControlled) {
+        onOpenChange?.(next);
+        return;
+      }
+      setUncontrolledOpen((prev) => {
         if (prev !== next) onOpenChange?.(next);
         return next;
       });
     },
-    [onOpenChange],
+    [isControlled, onOpenChange],
   );
 
   const ctx = useFieldContext();
@@ -153,7 +197,7 @@ export function DatePicker({
   const skipNextOpen = useRef(false);
 
   const openPopup = useCallback(() => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     if (skipNextOpen.current) {
       skipNextOpen.current = false;
       return;
@@ -171,7 +215,19 @@ export function DatePicker({
         setIsOpen(true);
       });
     }, 50);
-  }, [disabled, placement, setIsOpen]);
+  }, [disabled, readOnly, placement, setIsOpen]);
+
+  // Once the popover is mounted, recompute the position using its real height.
+  // The first pass in openPopup uses the CALENDAR_HEIGHT over-estimate; the
+  // month view actually renders ~285px, so re-running with the measured height
+  // removes the gap when flipped above and avoids flipping above when the
+  // shorter calendar would have fit below.
+  useEffect(() => {
+    if (!isOpen || !popoverRef.current || !wrapperRef.current) return;
+    const measuredHeight = popoverRef.current.offsetHeight;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    setPopupStyle(computePopupStyle(rect, placement, measuredHeight));
+  }, [isOpen, placement]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -265,12 +321,13 @@ export function DatePicker({
           aria-required={resolvedRequired ? 'true' : undefined}
           aria-invalid={resolvedInvalid ? 'true' : undefined}
           aria-describedby={describedBy}
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
+          aria-readonly={readOnly ? 'true' : undefined}
+          aria-haspopup={readOnly ? undefined : 'dialog'}
+          aria-expanded={readOnly ? undefined : isOpen}
           role="combobox"
           className={inputClasses}
         />
-        {clearable && value && !disabled ? (
+        {clearable && value && !disabled && !readOnly ? (
           <button
             type="button"
             aria-label="Clear date"
@@ -297,7 +354,7 @@ export function DatePicker({
         )}
       </div>
 
-      {isOpen && !disabled && createPortal(
+      {isOpen && !disabled && !readOnly && createPortal(
         <div
           ref={popoverRef}
           className="pis-datepicker-popover"
@@ -320,6 +377,11 @@ export function DatePicker({
             defaultActiveStartDate={selectedDate ?? minDate}
             minDate={minDate}
             maxDate={maxDate}
+            tileDisabled={
+              isDateDisabled
+                ? ({ date, view }) => view === 'month' && isDateDisabled(date)
+                : undefined
+            }
             locale={locale}
             defaultView="month"
             showNeighboringDecade={true}
