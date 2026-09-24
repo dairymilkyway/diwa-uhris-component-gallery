@@ -89,14 +89,6 @@ function getScrollParent(el: Element | null): Element | null {
 export function computePopupStyle(
   rect: DOMRect,
   placement: 'auto' | 'below' | 'above' = 'auto',
-  // Actual rendered popover height once mounted. Before the first measurement
-  // we fall back to CALENDAR_HEIGHT (a deliberate over-estimate) so the initial
-  // paint never overflows; the component re-runs this with the real height on
-  // the next frame. Using the real height matters because the month view is
-  // only ~285px tall — assuming 360px both (a) flips above too eagerly when the
-  // shorter calendar would fit below and (b) leaves a visible gap above the
-  // trigger, since the above-placement anchors to a 360px slot the calendar
-  // doesn't fill.
   measuredHeight?: number,
 ): React.CSSProperties {
   const height = measuredHeight ?? CALENDAR_HEIGHT;
@@ -109,9 +101,7 @@ export function computePopupStyle(
     width: isNarrow ? `calc(100vw - 16px)` : undefined,
   };
   // Decide side: forced placement wins; otherwise prefer below unless the
-  // calendar doesn't fit below AND there's more room above. Either way the top
-  // is clamped so the calendar never runs off the top or bottom of the viewport
-  // (min 8px gap).
+  // calendar doesn't fit below AND there's more room above.
   const placeBelow =
     placement === 'below'
       ? true
@@ -121,8 +111,6 @@ export function computePopupStyle(
   if (placeBelow) {
     style.top = Math.min(rect.bottom + 6, window.innerHeight - height - 8);
   } else {
-    // Anchor to the real height so the calendar sits just above the trigger
-    // (6px gap) instead of floating at a fixed 360px offset.
     style.top = Math.max(rect.top - height - 6, 8);
   }
   return style;
@@ -156,9 +144,7 @@ export function DatePicker({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const isOpen = isControlled ? open : uncontrolledOpen;
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
-  // Gates popover visibility until the layout effect has measured its real
-  // height and computed the final position. Prevents the visible "open below,
-  // then flip up" jump that a post-paint reposition would cause.
+  // Gates visibility until useLayoutEffect measures real height and computes final position.
   const [positioned, setPositioned] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -222,12 +208,9 @@ export function DatePicker({
     }, 50);
   }, [disabled, readOnly, placement, setIsOpen]);
 
-  // Before the browser paints the open popover, measure its real height and
-  // compute the final position, then reveal it. Runs as a layout effect so the
-  // measure→reposition happens in the same frame the popover mounts — the user
-  // never sees it open in one spot and jump to another. The first pass in
-  // openPopup uses the CALENDAR_HEIGHT over-estimate purely to size the initial
-  // (hidden) render; the real height (~285px month view) drives what's shown.
+  // Measure real height and compute final position before browser paints.
+  // The popover renders hidden (opacity:0, animation:none via CSS class),
+  // then this effect measures and repositions it, then reveals it.
   useLayoutEffect(() => {
     if (!isOpen) {
       setPositioned(false);
@@ -252,25 +235,34 @@ export function DatePicker({
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [setIsOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !positioned) return;
 
-    // Attach scroll-close listeners. Position was already computed in openPopup
-    // before isOpen was set, so we don't need any delay here.
+    // Arm scroll-close only once the popover is positioned/visible. Clicking the
+    // trigger focuses the input, which makes the browser auto-scroll the nearest
+    // scroll container to bring it into view. That involuntary scroll fires right
+    // as the popover opens and must NOT dismiss it. We ignore scroll events during
+    // a short settle window after arming.
+    let armed = false;
+    const armTimer = window.setTimeout(() => { armed = true; }, 150);
+
     const close = () => setIsOpen(false);
+    const onScroll = () => { if (armed) setIsOpen(false); };
+
     const scrollParent = getScrollParent(wrapperRef.current?.parentElement ?? null);
-    if (scrollParent) scrollParent.addEventListener('scroll', close, { passive: true });
-    window.addEventListener('scroll', close, { capture: true, passive: true });
+    if (scrollParent) scrollParent.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', close);
 
     return () => {
-      if (scrollParent) scrollParent.removeEventListener('scroll', close);
-      window.removeEventListener('scroll', close, { capture: true });
+      window.clearTimeout(armTimer);
+      if (scrollParent) scrollParent.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scroll', onScroll, { capture: true });
       window.removeEventListener('resize', close);
     };
-  }, [isOpen]);
+  }, [isOpen, positioned, setIsOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -287,7 +279,7 @@ export function DatePicker({
     const wrapper = wrapperRef.current;
     wrapper?.addEventListener('focusout', handleFocusOut);
     return () => wrapper?.removeEventListener('focusout', handleFocusOut);
-  }, [isOpen]);
+  }, [isOpen, setIsOpen]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
@@ -368,8 +360,8 @@ export function DatePicker({
       {isOpen && !disabled && !readOnly && createPortal(
         <div
           ref={popoverRef}
-          className="pis-datepicker-popover"
-          style={{ ...popupStyle, visibility: positioned ? undefined : 'hidden' }}
+          className={cn('pis-datepicker-popover', !positioned && 'pis-datepicker-popover--measuring')}
+          style={popupStyle}
           role="dialog"
           aria-label={ariaLabel ? `${ariaLabel} calendar` : 'Date picker'}
           aria-modal="false"

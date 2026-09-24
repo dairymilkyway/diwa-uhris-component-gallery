@@ -113,6 +113,35 @@ function MaxDateExample() {
   );
 }
 
+function ReadOnlyExample() {
+  return (
+    <DatePicker
+      value="2025-03-15"
+      onChange={() => {}}
+      readOnly
+    />
+  );
+}
+
+function IsDateDisabledExample() {
+  const [date, setDate] = useState('');
+  // Disable weekends
+  const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+  return (
+    <div className="space-y-1">
+      <DatePicker
+        value={date}
+        onChange={setDate}
+        placeholder="Weekdays only…"
+        isDateDisabled={isWeekend}
+      />
+      {date && (
+        <p className="text-xs font-medium text-slate-400">Selected: {date}</p>
+      )}
+    </div>
+  );
+}
+
 // ── Code strings — centralized per canonical architecture ─────────────────
 
 const CODE = {
@@ -183,6 +212,23 @@ const today = new Date();
   value={date}
   onChange={setDate}
   dateFormat="EEE, dd MMM yyyy"
+/>`,
+
+  readOnly: `// readOnly — value is shown but calendar can't open (non-greyed styling)
+<DatePicker
+  value="2025-03-15"
+  onChange={() => {}}
+  readOnly
+/>`,
+
+  isDateDisabled: `// isDateDisabled blocks individual dates (e.g. weekends)
+const isWeekend = (d: Date) => d.getDay() === 0 || d.getDay() === 6;
+
+<DatePicker
+  value={date}
+  onChange={setDate}
+  placeholder="Weekdays only…"
+  isDateDisabled={isWeekend}
 />`,
 };
 
@@ -269,6 +315,18 @@ export default function DatePickerPage() {
               <CustomFormatExample />
             </div>
           </Showcase>
+          <Showcase code={CODE.readOnly} language="tsx" title="Read-only">
+            <p className="mb-3 text-sm text-slate-600">Value is shown but the calendar can't be opened. Unlike disabled, keeps normal styling.</p>
+            <div className="w-64">
+              <ReadOnlyExample />
+            </div>
+          </Showcase>
+          <Showcase code={CODE.isDateDisabled} language="tsx" title="Disable specific dates">
+            <p className="mb-3 text-sm text-slate-600">Block individual dates with a predicate (e.g., weekends, holidays).</p>
+            <div className="w-64">
+              <IsDateDisabledExample />
+            </div>
+          </Showcase>
         </GallerySection>
 
         {/* Accessibility ── */}
@@ -332,6 +390,10 @@ export default function DatePickerPage() {
             { name: 'placement',       type: "'auto' | 'below' | 'above'", default: "'auto'", description: 'Force the popover side. Auto flips based on viewport space; all modes stay clamped on-screen.' },
             { name: 'locale',          type: 'string',     description: "BCP-47 locale forwarded to the calendar (e.g. 'fr-FR')." },
             { name: 'name',            type: 'string',     description: 'Name forwarded to the trigger input for form association.' },
+            { name: 'isDateDisabled',  type: '(date: Date) => boolean', description: 'Per-day predicate to disable individual dates. Return true to disable.' },
+            { name: 'readOnly',        type: 'boolean',    default: 'false', description: 'Value is shown but calendar cannot open. Keeps normal (non-greyed) styling.' },
+            { name: 'open',            type: 'boolean',    description: 'Controlled open state. When provided, parent owns open/close via onOpenChange.' },
+            { name: 'defaultOpen',     type: 'boolean',    default: 'false', description: 'Initial open state when uncontrolled. Ignored when open is provided.' },
             { name: 'className',       type: 'string',                 description: 'Additional CSS classes on the trigger input.' },
           ]} />
         </GallerySection>
