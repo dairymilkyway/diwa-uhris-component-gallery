@@ -9,7 +9,7 @@
  * position:fixed works correctly even when the DatePicker is inside a
  * CSS transform context (e.g. a Modal with -translate-x/y centering).
  */
-import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import Calendar from 'react-calendar';
 import { format, parse, isValid } from 'date-fns';
@@ -90,7 +90,7 @@ export function computePopupStyle(
   rect: DOMRect,
   placement: 'auto' | 'below' | 'above' = 'auto',
   measuredHeight?: number,
-): React.CSSProperties {
+): { style: React.CSSProperties; placedAbove: boolean } {
   const height = measuredHeight ?? CALENDAR_HEIGHT;
   const spaceBelow = window.innerHeight - rect.bottom;
   const spaceAbove = rect.top;
@@ -113,7 +113,7 @@ export function computePopupStyle(
   } else {
     style.top = Math.max(rect.top - height - 6, 8);
   }
-  return style;
+  return { style, placedAbove: !placeBelow };
 }
 
 export function DatePicker({
@@ -144,8 +144,8 @@ export function DatePicker({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const isOpen = isControlled ? open : uncontrolledOpen;
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({});
-  // Gates visibility until useLayoutEffect measures real height and computes final position.
-  const [positioned, setPositioned] = useState(false);
+  // Remember whether we placed above or below so remeasure doesn't flip
+  const placedAbove = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -192,67 +192,74 @@ export function DatePicker({
       skipNextOpen.current = false;
       return;
     }
-    // Compute position BEFORE rendering the portal so we never flash at -9999.
-    // We use setTimeout(50) + rAF to let any auto-scroll-to-focus complete first,
-    // then read a stable getBoundingClientRect() and open with the correct position.
+    // Just open - positioning will happen in the effect after mount
     setTimeout(() => {
       if (!wrapperRef.current) return;
       requestAnimationFrame(() => {
         if (!wrapperRef.current) return;
+        // Store initial rect info for placement decision
         const rect = wrapperRef.current.getBoundingClientRect();
-        const style = computePopupStyle(rect, placement);
-        setPopupStyle(style);
-        setPositioned(false);
+        const result = computePopupStyle(rect, placement);
+        placedAbove.current = result.placedAbove;
         setIsOpen(true);
       });
     }, 50);
   }, [disabled, readOnly, placement, setIsOpen]);
 
-  // Measure real height and compute final position before browser paints.
-  // The popover renders hidden (opacity:0, animation:none via CSS class),
-  // then this effect measures and repositions it, then reveals it.
-  useLayoutEffect(() => {
+  // Measure real height and compute final position after the popover mounts.
+  const [popoverReady, setPopoverReady] = useState(false);
+  
+  useEffect(() => {
     if (!isOpen) {
-      setPositioned(false);
+      setPopoverReady(false);
+      setPopupStyle({});
       return;
     }
-    if (!popoverRef.current || !wrapperRef.current) return;
-    const measuredHeight = popoverRef.current.offsetHeight;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    setPopupStyle(computePopupStyle(rect, placement, measuredHeight));
-    setPositioned(true);
-  }, [isOpen, placement]);
+    const frameId = requestAnimationFrame(() => {
+      if (!popoverRef.current || !wrapperRef.current) return;
+      const measuredHeight = popoverRef.current.offsetHeight;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      // Use the stored placement decision
+      const forcedPlacement = placedAbove.current ? 'above' : 'below';
+      const result = computePopupStyle(rect, forcedPlacement, measuredHeight);
+      setPopupStyle(result.style);
+      setPopoverReady(true);
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      if (
-        wrapperRef.current && !wrapperRef.current.contains(target) &&
-        popoverRef.current && !popoverRef.current.contains(target)
-      ) {
+      // popoverRef.current may be null briefly during mount — don't close in that case
+      if (!popoverRef.current) return;
+      // Check if click is inside our wrapper or our popover
+      const inWrapper = wrapperRef.current?.contains(target);
+      const inPopover = popoverRef.current.contains(target);
+      if (!inWrapper && !inPopover) {
         setIsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [setIsOpen]);
+  }, [isOpen, setIsOpen]);
 
   useEffect(() => {
-    if (!isOpen || !positioned) return;
+    if (!isOpen) return;
 
-    // Arm scroll-close only once the popover is positioned/visible. Clicking the
-    // trigger focuses the input, which makes the browser auto-scroll the nearest
-    // scroll container to bring it into view. That involuntary scroll fires right
-    // as the popover opens and must NOT dismiss it. We ignore scroll events during
-    // a short settle window after arming.
+    // Arm scroll-close after a short delay to ignore the auto-scroll that
+    // browsers fire when focusing the input.
     let armed = false;
-    const armTimer = window.setTimeout(() => { armed = true; }, 150);
+    const armTimer = window.setTimeout(() => { armed = true; }, 100);
 
     const close = () => setIsOpen(false);
-    const onScroll = () => { if (armed) setIsOpen(false); };
+    const onScroll = () => { if (armed) close(); };
 
     const scrollParent = getScrollParent(wrapperRef.current?.parentElement ?? null);
-    if (scrollParent) scrollParent.addEventListener('scroll', onScroll, { passive: true });
+    if (scrollParent) {
+      scrollParent.addEventListener('scroll', onScroll, { passive: true });
+    }
     window.addEventListener('scroll', onScroll, { capture: true, passive: true });
     window.addEventListener('resize', close);
 
@@ -262,17 +269,16 @@ export function DatePicker({
       window.removeEventListener('scroll', onScroll, { capture: true });
       window.removeEventListener('resize', close);
     };
-  }, [isOpen, positioned, setIsOpen]);
+  }, [isOpen, setIsOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
     function handleFocusOut(e: FocusEvent) {
       if (!e.relatedTarget) return;
       const target = e.relatedTarget as Node;
-      if (
-        wrapperRef.current && !wrapperRef.current.contains(target) &&
-        popoverRef.current && !popoverRef.current.contains(target)
-      ) {
+      const inWrapper = wrapperRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inWrapper && !inPopover) {
         setIsOpen(false);
       }
     }
@@ -360,8 +366,11 @@ export function DatePicker({
       {isOpen && !disabled && !readOnly && createPortal(
         <div
           ref={popoverRef}
-          className={cn('pis-datepicker-popover', !positioned && 'pis-datepicker-popover--measuring')}
-          style={popupStyle}
+          className="pis-datepicker-popover"
+          style={{
+            ...popupStyle,
+            visibility: popoverReady ? 'visible' : 'hidden',
+          }}
           role="dialog"
           aria-label={ariaLabel ? `${ariaLabel} calendar` : 'Date picker'}
           aria-modal="false"
