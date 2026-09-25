@@ -105,12 +105,17 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
 
   useEffect(() => {
     if (!isOpen) return;
-    const close = () => setIsOpen(false);
+    const close = (e: Event) => {
+      // Scrolling inside the dropdown panel itself should not close it.
+      if (listRef.current && listRef.current.contains(e.target as Node)) return;
+      setIsOpen(false);
+    };
+    const closeOnResize = () => setIsOpen(false);
     window.addEventListener('scroll', close, { capture: true, passive: true });
-    window.addEventListener('resize', close);
+    window.addEventListener('resize', closeOnResize);
     return () => {
       window.removeEventListener('scroll', close, { capture: true });
-      window.removeEventListener('resize', close);
+      window.removeEventListener('resize', closeOnResize);
     };
   }, [isOpen]);
 
