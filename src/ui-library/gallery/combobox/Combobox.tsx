@@ -3,7 +3,7 @@
  * Copied from shared/components/PisCombobox.tsx and isolated.
  * No production imports.
  */
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -86,7 +86,7 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
   }, []);
 
   // Compute portal panel position from wrapper bounding rect
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !wrapperRef.current) return;
     const rect = wrapperRef.current.getBoundingClientRect();
     setPanelStyle({
@@ -101,6 +101,17 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
       // Prevent wheel events from escaping to the locked body scroll container.
       overscrollBehavior: 'contain',
     });
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const close = () => setIsOpen(false);
+    window.addEventListener('scroll', close, { capture: true, passive: true });
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, { capture: true });
+      window.removeEventListener('resize', close);
+    };
   }, [isOpen]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
