@@ -133,6 +133,10 @@ export function Menu({
           ? { left: Math.max(MARGIN, Math.min(rect.left, window.innerWidth - MARGIN)), right: 'auto' }
           : { right: Math.max(MARGIN, window.innerWidth - rect.right), left: 'auto' };
 
+      const maxHeight = flipUp
+        ? Math.max(120, rect.top - GAP - MARGIN)
+        : Math.max(120, spaceBelow - GAP - MARGIN);
+
       setPanelStyle({
         position: 'fixed',
         // When flipping up, anchor to the bottom so the panel grows upward and
@@ -141,6 +145,7 @@ export function Menu({
           ? { bottom: Math.max(MARGIN, window.innerHeight - rect.top + GAP) }
           : { top: rect.bottom + GAP }),
         ...horizontal,
+        maxHeight,
         zIndex: 9999,
         minWidth: PANEL_MIN_WIDTH,
         maxWidth: available,
@@ -284,7 +289,7 @@ export function Menu({
           aria-label={ariaLabel}
           style={panelStyle}
           className={cn(
-            'overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl',
+            'overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-xl',
             panelClassName,
           )}
         >
