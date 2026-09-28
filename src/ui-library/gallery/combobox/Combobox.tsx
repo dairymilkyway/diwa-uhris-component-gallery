@@ -88,7 +88,7 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
   // Compute and track portal panel position.
   // Uses requestAnimationFrame so the initial measurement runs after the browser
   // has applied any focus-triggered scroll-to-view (useLayoutEffect fires too early).
-  // Page scroll closes the dropdown; resize recalculates position.
+  // Scroll and resize listeners recompute position so the panel stays anchored to the input.
   useEffect(() => {
     if (!isOpen) return;
 
@@ -112,20 +112,15 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
       });
     };
 
-    const closeOnScroll = (e: Event) => {
-      // Scrolling inside the dropdown panel itself should not close it.
-      if (listRef.current && listRef.current.contains(e.target as Node)) return;
-      setIsOpen(false);
-    };
-
     // rAF defers initial measurement past browser scroll-to-view
     const raf = requestAnimationFrame(updatePosition);
-    window.addEventListener('scroll', closeOnScroll, { capture: true, passive: true });
+    // Recompute on every scroll/resize so the panel tracks the input
+    window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
     window.addEventListener('resize', updatePosition);
 
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', closeOnScroll, { capture: true });
+      window.removeEventListener('scroll', updatePosition, { capture: true });
       window.removeEventListener('resize', updatePosition);
     };
   }, [isOpen]);
