@@ -3,7 +3,7 @@
  * Copied from shared/components/PisCombobox.tsx and isolated.
  * No production imports.
  */
-import { useState, useRef, useEffect, useLayoutEffect, useId } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -85,37 +85,41 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Compute portal panel position from wrapper bounding rect
-  useLayoutEffect(() => {
-    if (!isOpen || !wrapperRef.current) return;
-    const rect = wrapperRef.current.getBoundingClientRect();
-    setPanelStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: rect.left,
-      zIndex: 9999,
-      width: rect.width,
-      // Radix Dialog sets pointer-events:none on <body> while open.
-      // The portal renders into body and inherits it — restore interactivity here.
-      pointerEvents: 'auto',
-      // Prevent wheel events from escaping to the locked body scroll container.
-      overscrollBehavior: 'contain',
-    });
-  }, [isOpen]);
-
+  // Compute and track portal panel position.
+  // Uses requestAnimationFrame so the initial measurement runs after the browser
+  // has applied any focus-triggered scroll-to-view (useLayoutEffect fires too early).
+  // Scroll and resize listeners keep the panel anchored to the input while open.
   useEffect(() => {
     if (!isOpen) return;
-    const close = (e: Event) => {
-      // Scrolling inside the dropdown panel itself should not close it.
-      if (listRef.current && listRef.current.contains(e.target as Node)) return;
-      setIsOpen(false);
+
+    const updatePosition = () => {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const dropUp = spaceBelow < 240 && rect.top > 240;
+      setPanelStyle({
+        position: 'fixed',
+        top: dropUp ? undefined : rect.bottom + 4,
+        bottom: dropUp ? (window.innerHeight - rect.top + 4) : undefined,
+        left: rect.left,
+        zIndex: 9999,
+        width: rect.width,
+        // Radix Dialog sets pointer-events:none on <body> while open.
+        // The portal renders into body and inherits it — restore interactivity here.
+        pointerEvents: 'auto',
+        // Prevent wheel events from escaping to the locked body scroll container.
+        overscrollBehavior: 'contain',
+      });
     };
-    const closeOnResize = () => setIsOpen(false);
-    window.addEventListener('scroll', close, { capture: true, passive: true });
-    window.addEventListener('resize', closeOnResize);
+
+    const raf = requestAnimationFrame(updatePosition);
+    window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
+    window.addEventListener('resize', updatePosition);
+
     return () => {
-      window.removeEventListener('scroll', close, { capture: true });
-      window.removeEventListener('resize', closeOnResize);
+      cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', updatePosition, { capture: true });
+      window.removeEventListener('resize', updatePosition);
     };
   }, [isOpen]);
 
