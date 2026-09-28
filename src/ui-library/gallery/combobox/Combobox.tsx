@@ -3,7 +3,7 @@
  * Copied from shared/components/PisCombobox.tsx and isolated.
  * No production imports.
  */
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '../../../lib/utils';
@@ -87,43 +87,53 @@ export function Combobox({ value: controlledValue, defaultValue = '', onChange, 
 
   // Compute and track portal panel position.
   // Uses requestAnimationFrame so the initial measurement runs after the browser
-  // has applied any focus-triggered scroll-to-view (useLayoutEffect fires too early).
-  // Scroll and resize listeners recompute position so the panel stays anchored to the input.
+  // has applied any focus-triggered scroll-to-view.
+  // Scroll and resize listeners are registered ONCE at mount (not inside [isOpen] effect)
+  // because React 19 concurrent mode may defer [isOpen]-dependent effects. The handlers
+  // read isOpenRef to skip work when the dropdown is closed.
+
+  // Always-current ref — avoids stale closure in the mount-once listeners below
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => { isOpenRef.current = isOpen; });
+
+  // Compute position and write it to panelStyle
+  const doUpdatePosition = useCallback(() => {
+    if (!wrapperRef.current) return;
+    const rect = wrapperRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropUp = spaceBelow < 240 && rect.top > 240;
+    setPanelStyle({
+      position: 'fixed',
+      top: dropUp ? undefined : rect.bottom + 4,
+      bottom: dropUp ? (window.innerHeight - rect.top + 4) : undefined,
+      left: rect.left,
+      zIndex: 9999,
+      width: rect.width,
+      // Radix Dialog sets pointer-events:none on <body> while open.
+      pointerEvents: 'auto',
+      overscrollBehavior: 'contain',
+    });
+  }, []);
+
+  // Initial position when the dropdown opens — deferred one rAF past scroll-to-view
   useEffect(() => {
     if (!isOpen) return;
+    const raf = requestAnimationFrame(doUpdatePosition);
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, doUpdatePosition]);
 
-    const updatePosition = () => {
-      if (!wrapperRef.current) return;
-      const rect = wrapperRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const dropUp = spaceBelow < 240 && rect.top > 240;
-      setPanelStyle({
-        position: 'fixed',
-        top: dropUp ? undefined : rect.bottom + 4,
-        bottom: dropUp ? (window.innerHeight - rect.top + 4) : undefined,
-        left: rect.left,
-        zIndex: 9999,
-        width: rect.width,
-        // Radix Dialog sets pointer-events:none on <body> while open.
-        // The portal renders into body and inherits it — restore interactivity here.
-        pointerEvents: 'auto',
-        // Prevent wheel events from escaping to the locked body scroll container.
-        overscrollBehavior: 'contain',
-      });
+  // Mount-once scroll/resize tracking — always registered, skips when closed
+  useEffect(() => {
+    const onScrollOrResize = () => {
+      if (isOpenRef.current) doUpdatePosition();
     };
-
-    // rAF defers initial measurement past browser scroll-to-view
-    const raf = requestAnimationFrame(updatePosition);
-    // Recompute on every scroll/resize so the panel tracks the input
-    window.addEventListener('scroll', updatePosition, { capture: true, passive: true });
-    window.addEventListener('resize', updatePosition);
-
+    window.addEventListener('scroll', onScrollOrResize, { capture: true, passive: true });
+    window.addEventListener('resize', onScrollOrResize);
     return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', updatePosition, { capture: true });
-      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', onScrollOrResize, { capture: true });
+      window.removeEventListener('resize', onScrollOrResize);
     };
-  }, [isOpen]);
+  }, [doUpdatePosition]); // doUpdatePosition is stable (useCallback [])
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (!isOpen) setHighlightIndex(-1); }, [isOpen]);
