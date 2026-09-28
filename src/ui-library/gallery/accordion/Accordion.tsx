@@ -198,7 +198,7 @@ export function AccordionContent({ children, className = '' }: AccordionContentP
       aria-hidden={!isOpen || undefined}
       data-state={isOpen ? 'open' : 'closed'}
       className={cn(
-        'grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out',
+        'grid [overflow:clip] transition-[grid-template-rows] duration-200 ease-out',
         isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
       )}
     >
