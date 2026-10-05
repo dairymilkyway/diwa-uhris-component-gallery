@@ -67,17 +67,30 @@ export function Dropdown({
   const panelId = `${uid.replace(/:/g, '')}-panel`;
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
 
-  // Compute portal panel position from trigger bounding rect
+  // Compute portal panel position from trigger bounding rect. Because the panel
+  // is position:fixed, its coordinates must be recomputed on scroll/resize or it
+  // stays locked in the viewport while the trigger scrolls away.
   useEffect(() => {
     if (!isOpen || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setPanelStyle({
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: rect.left,
-      zIndex: 9999,
-      minWidth: Math.max(rect.width, 180),
-    });
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPanelStyle({
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        zIndex: 9999,
+        minWidth: Math.max(rect.width, 180),
+      });
+    };
+    updatePosition();
+    // capture:true catches scrolls on any ancestor, not just the window.
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
   }, [isOpen]);
 
   // Close on outside mousedown — return focus to trigger
