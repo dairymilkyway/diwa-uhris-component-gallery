@@ -62,32 +62,69 @@ export function Dropdown({
   panelClassName = '',
 }: DropdownProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const uid = useId();
   const panelId = `${uid.replace(/:/g, '')}-panel`;
   const [panelStyle, setPanelStyle] = useState<React.CSSProperties>({});
+  // The panel must be mounted to be measured (for flip/clamp), but rendering it
+  // before it's positioned flashes at the body's top-left. So we mount it hidden
+  // and reveal it once the position is computed.
+  const [positioned, setPositioned] = useState(false);
 
   // Compute portal panel position from trigger bounding rect. Because the panel
   // is position:fixed, its coordinates must be recomputed on scroll/resize or it
-  // stays locked in the viewport while the trigger scrolls away.
+  // stays locked in the viewport while the trigger scrolls away. Placement is
+  // viewport-aware: it flips above the trigger when there isn't room below, and
+  // clamps to stay on-screen, so a trigger near the bottom edge still shows a
+  // reachable panel.
   useEffect(() => {
-    if (!isOpen || !triggerRef.current) return;
+    if (!isOpen || !triggerRef.current) {
+      setPositioned(false);
+      return;
+    }
+    const GAP = 4;
+    const MARGIN = 8;
     const updatePosition = () => {
       if (!triggerRef.current) return;
       const rect = triggerRef.current.getBoundingClientRect();
+      // Measured once the panel has mounted; fall back to its max-height (280)
+      // on the very first pass before the ref is populated.
+      const panelHeight = panelRef.current?.offsetHeight ?? 280;
+      const panelWidth = panelRef.current?.offsetWidth ?? Math.max(rect.width, 180);
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // Prefer below; flip above only when it doesn't fit below AND there's more room above.
+      const placeBelow = spaceBelow >= panelHeight + GAP + MARGIN || spaceBelow >= spaceAbove;
+      const top = placeBelow
+        ? Math.min(rect.bottom + GAP, window.innerHeight - panelHeight - MARGIN)
+        : Math.max(rect.top - panelHeight - GAP, MARGIN);
+      const left = Math.max(
+        MARGIN,
+        Math.min(rect.left, window.innerWidth - panelWidth - MARGIN),
+      );
       setPanelStyle({
         position: 'fixed',
-        top: rect.bottom + 4,
-        left: rect.left,
-        zIndex: 9999,
+        top: Math.max(MARGIN, top),
+        left,
+        // Below the DatePicker calendar's z-index (1050 in ui.css) so a calendar
+        // the panel spawns paints on top, but above normal page content.
+        zIndex: 1000,
         minWidth: Math.max(rect.width, 180),
       });
     };
     updatePosition();
+    // A second pass next frame uses the now-mounted panel's real measured height,
+    // then reveal the panel to avoid a flash at the pre-positioned location.
+    const raf = requestAnimationFrame(() => {
+      updatePosition();
+      setPositioned(true);
+    });
     // capture:true catches scrolls on any ancestor, not just the window.
     window.addEventListener('scroll', updatePosition, true);
     window.addEventListener('resize', updatePosition);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
@@ -98,6 +135,12 @@ export function Dropdown({
     if (!isOpen) return;
     const handlePointerDown = (e: MouseEvent) => {
       const target = e.target as Node;
+      // The panel is portaled to document.body, so it is NOT a descendant of
+      // `ref`. Treat clicks inside the panel itself — and inside a portaled
+      // DatePicker calendar it may spawn (also in document.body) — as "inside",
+      // or interacting with panel content would dismiss the dropdown.
+      if (panelRef.current?.contains(target)) return;
+      if ((target as Element).closest?.('.pis-datepicker-popover')) return;
       if (ref.current && !ref.current.contains(target)) {
         onClose();
         triggerRef.current?.focus();
@@ -143,9 +186,10 @@ export function Dropdown({
       {isOpen && createPortal(
         <div
           id={panelId}
-          style={panelStyle}
+          ref={panelRef}
+          style={{ ...panelStyle, visibility: positioned ? 'visible' : 'hidden' }}
           className={cn(
-            'max-h-[280px] overflow-y-auto',
+            'w-max max-w-[calc(100vw-16px)] max-h-[280px] overflow-y-auto',
             'rounded-xl border border-slate-200 bg-white shadow-lg',
             panelClassName,
           )}
