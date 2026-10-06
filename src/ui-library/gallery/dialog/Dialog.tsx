@@ -123,12 +123,12 @@ export function Dialog({
       }}
     >
       <DialogPrimitive.Portal>
-        {/* Backdrop — DIWA visual treatment */}
+        {/* Backdrop — DIWA visual treatment (no blur/animation for lag-free open) */}
         <DialogPrimitive.Overlay
-          className="fixed inset-0 z-50 bg-brand-navy/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-200"
+          className="fixed inset-0 z-50 bg-brand-navy/60"
         />
 
-        {/* Panel — DIWA visual treatment */}
+        {/* Panel — DIWA visual treatment (static, no open/close animation) */}
         <DialogPrimitive.Content
           className={cn(
             'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
@@ -136,10 +136,6 @@ export function Dialog({
             'rounded-lg bg-white shadow-xl',
             'max-h-[90vh] outline-none',
             SIZE_CLASS[size],
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
-            'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
-            'duration-200',
           )}
           // Suppress Radix's own Escape/outside-click when preventClose is set.
           // Radix calls these before triggering onOpenChange, so preventing here

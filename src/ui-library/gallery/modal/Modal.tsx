@@ -148,15 +148,12 @@ export default function Modal({
     >
       <DialogPrimitive.Portal>
         {/* Backdrop — DIWA visual treatment.
-            No backdrop-blur: blurring the full viewport every animation frame
-            is the main source of modal jank on heavy pages. */}
+            No blur and no animation: the modal appears instantly (lag-free). */}
         <DialogPrimitive.Overlay
-          className="fixed inset-0 z-50 bg-brand-navy/60 will-change-[opacity] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-150 ease-out"
+          className="fixed inset-0 z-50 bg-brand-navy/60"
         />
 
-        {/* Centering layer — flex centering instead of translate(-50%,-50%) so
-            the zoom keyframes only animate scale and never fight the centering
-            transform (which caused the panel to slide in diagonally). */}
+        {/* Centering layer — flex centering (no transforms). */}
         <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Panel — DIWA visual treatment */}
         <DialogPrimitive.Content
@@ -166,11 +163,6 @@ export default function Modal({
             'rounded-lg border border-slate-200 bg-white shadow-xl',
             'max-h-[85vh] outline-none',
             maxWidth,
-            'will-change-[transform,opacity]',
-            'data-[state=open]:animate-in data-[state=closed]:animate-out',
-            'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
-            'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
-            'duration-150 ease-out',
           )}
           style={{ padding: 0 }}
           onOpenAutoFocus={onOpenAutoFocus}
