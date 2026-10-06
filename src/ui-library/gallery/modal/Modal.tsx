@@ -147,23 +147,30 @@ export default function Modal({
       onOpenChange={(isOpen) => { if (!isOpen && !preventClose) onClose(); }}
     >
       <DialogPrimitive.Portal>
-        {/* Backdrop — DIWA visual treatment */}
+        {/* Backdrop — DIWA visual treatment.
+            No backdrop-blur: blurring the full viewport every animation frame
+            is the main source of modal jank on heavy pages. */}
         <DialogPrimitive.Overlay
-          className="fixed inset-0 z-50 bg-brand-navy/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-200"
+          className="fixed inset-0 z-50 bg-brand-navy/60 will-change-[opacity] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 duration-150 ease-out"
         />
 
+        {/* Centering layer — flex centering instead of translate(-50%,-50%) so
+            the zoom keyframes only animate scale and never fight the centering
+            transform (which caused the panel to slide in diagonally). */}
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
         {/* Panel — DIWA visual treatment */}
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
+            'pointer-events-auto relative',
             'flex w-full flex-col',
             'rounded-lg border border-slate-200 bg-white shadow-xl',
             'max-h-[85vh] outline-none',
             maxWidth,
+            'will-change-[transform,opacity]',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0',
             'data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95',
-            'duration-200',
+            'duration-150 ease-out',
           )}
           style={{ padding: 0 }}
           onOpenAutoFocus={onOpenAutoFocus}
@@ -250,6 +257,7 @@ export default function Modal({
             </>
           )}
         </DialogPrimitive.Content>
+        </div>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
