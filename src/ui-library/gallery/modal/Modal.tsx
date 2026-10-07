@@ -28,7 +28,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { cn } from '../../../lib/utils';
+import { cn, FLOATING_LAYER_SELECTOR } from '../../../lib/utils';
 import { typography } from '../../tokens/typography';
 
 export interface ModalProps {
@@ -170,9 +170,10 @@ export default function Modal({
           onEscapeKeyDown={preventClose ? (e) => e.preventDefault() : onEscapeKeyDown}
           onInteractOutside={(e) => {
             // Don't close the modal when the user interacts with a portaled
-            // DatePicker calendar (rendered in document.body outside this node).
+            // floating layer - a DatePicker calendar or a Menu panel - which is
+            // rendered in document.body outside this node.
             const target = e.target as Element | null;
-            if (target?.closest('.pis-datepicker-popover')) {
+            if (target?.closest(FLOATING_LAYER_SELECTOR)) {
               e.preventDefault();
               return;
             }

@@ -29,7 +29,7 @@
 
 import { cloneElement, isValidElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { cn } from '../../../lib/utils';
+import { cn, FLOATING_LAYER_ATTR } from '../../../lib/utils';
 
 export type MenuItemTone = 'default' | 'danger';
 
@@ -287,7 +287,10 @@ export function Menu({
           ref={panelRef}
           role="menu"
           aria-label={ariaLabel}
-          style={panelStyle}
+          // Stay clickable (and not count as "outside") inside an open
+          // Modal/Dialog, which sets pointer-events: none on <body>.
+          {...{ [FLOATING_LAYER_ATTR]: '' }}
+          style={{ ...panelStyle, pointerEvents: 'auto' }}
           className={cn(
             'overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-xl',
             panelClassName,
